@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Philly Marathon Dashboard</title>
+<style>
+/* ── TOKENS ── */
+:root {
+  --bg:       #0D0F14;
+  --sur:      #161A23;
+  --sur2:     #1E2433;
+  --bdr:      #2C3347;
+  --txt:      #E8EBF4;
+  --mut:      #6B7494;
+  --acc:      #FF6B35;
+  --bl:       #4D9EFF;
+  --gr:       #3ECF8E;
+  --pu:       #9B7FEA;
+  --am:       #F59E0B;
+  --rd:       #F05252;
+  --mono:     'SF Mono','Fira Code','Consolas',monospace;
+  --sans:     'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --r:        8px;
+  --r2:       14px;
+  --shadow:   0 2px 12px rgba(0,0,0,.35);
+}
+[data-theme="light"] {
+  --bg:   #F7F8FC;
+  --sur:  #FFFFFF;
+  --sur2: #EEF0F8;
+  --bdr:  #DDE1EE;
+  --txt:  #0D0F14;
+  --mut:  #6B7494;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14px;min-height:100vh;transition:background .2s,color .2s}
+a{color:var(--bl);text-decoration:none}
+button{font-family:var(--sans);cursor:pointer}
+input,select,textarea{font-family:var(--sans)}
+
+/* ── LAYOUT ── */
+.app{max-width:1080px;margin:0 auto;padding:0 16px 80px}
+
+/* ── TOP BAR ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0 0;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.topbar-left h1{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--acc);margin-bottom:4px}
+.topbar-left .race-info{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.topbar-left .race-date{font-size:22px;font-weight:700;color:var(--txt);letter-spacing:-.3px}
+.topbar-left .goal-display{display:flex;align-items:center;gap:8px}
+.goal-time{font-size:18px;font-weight:600;font-family:var(--mono);color:var(--acc)}
+.goal-pace{font-size:13px;color:var(--mut)}
+.edit-goal-btn{background:none;border:1px solid var(--bdr);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--mut);transition:all .12s}
+.edit-goal-btn:hover{border-color:var(--acc);color:var(--acc)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.countdown{font-family:var(--mono);font-size:12px;background:var(--sur2);border:1px solid var(--bdr);border-radius:20px;padding:5px 14px;color:var(--mut)}
+.countdown span{color:var(--acc);font-weight:600}
+.theme-btn{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:7px 12px;font-size:13px;color:var(--mut);transition:all .12s}
+.theme-btn:hover{border-color:var(--acc);color:var(--txt)}
+
+/* ── METRICS ── */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+.met{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:13px 15px}
+.met-l{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:5px}
+.met-v{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1}
+.met-s{font-size:11px;color:var(--mut);margin-top:3px}
+.prog{height:4px;background:var(--sur2);border-radius:2px;overflow:hidden;margin-top:7px}
+.prog-f{height:100%;background:var(--acc);border-radius:2px;transition:width .6s}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--bdr);margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{font-size:13px;padding:9px 18px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--mut);cursor:pointer;white-space:nowrap;transition:color .12s}
+.tab:hover{color:var(--txt)}
+.tab.on{color:var(--txt);border-bottom-color:var(--acc);font-weight:500}
+
+/* ── PANE ── */
+.pane{display:none}.pane.on{display:block}
+
+/* ── PHASE BAR ── */
+.phase-bar{display:flex;gap:6px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.phase-btn{font-size:12px;padding:5px 14px;border-radius:20px;border:1px solid var(--bdr);background:var(--sur2);color:var(--mut);transition:all .12s}
+.phase-btn:hover{border-color:var(--acc);color:var(--txt)}
+.phase-btn.on{border-color:var(--acc);background:rgba(255,107,53,.12);color:var(--acc);font-weight:500}
+.phase-edit-btn{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--bdr);background:none;color:var(--mut);margin-left:auto}
+.phase-edit-btn:hover{border-color:var(--bl);color:var(--bl)}
+
+/* ── VIEW TOGGLE ── */
+.view-toggle{display:flex;gap:4px;margin-bottom:14px}
+.vbtn{font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--bdr);background:var(--sur2);color:var(--mut)}
+.vbtn.on{background:var(--sur);border-color:var(--bdr);color:var(--txt);font-weight:500}
+
+/* ── WEEK CHIP STRIP ── */
+.week-strip{display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;scrollbar-width:none}
+.week-strip::-webkit-scrollbar{display:none}
+.wchip{flex-shrink:0;font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:20px;border:1px solid var(--bdr);background:var(--sur2);color:var(--mut);transition:all .1s}
+.wchip:hover{border-color:var(--acc)}
+.wchip.on{background:rgba(255,107,53,.15);border-color:var(--acc);color:var(--acc);font-weight:600}
+.wchip.past{opacity:.35}
+
+/* ── WEEK CARD ── */
+.week-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)}
+.week-card.cur-week{border-color:var(--acc)}
+.wk-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.wk-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.wk-dates{font-size:12px;color:var(--mut);font-weight:400}
+.cur-badge{font-size:10px;background:rgba(255,107,53,.2);color:var(--acc);border:1px solid var(--acc);border-radius:20px;padding:2px 8px;font-weight:500}
+.phase-badge{font-size:10px;border-radius:20px;padding:2px 8px;font-weight:500;border:1px solid}
+.wk-mpw{font-family:var(--mono);font-size:13px;color:var(--mut);display:flex;align-items:center;gap:8px}
+.wk-mpw-actual{color:var(--gr);font-weight:600}
+
+/* ── DAY GRID ── */
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:12px}
+.dc{border-radius:var(--r);padding:8px 4px;text-align:center;min-height:68px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;border:1px solid var(--bdr);background:var(--sur2);position:relative;cursor:pointer;transition:border-color .12s}
+.dc:hover{border-color:var(--acc)}
+.dc.rest{opacity:.5}
+.dc-day{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin-bottom:4px;margin-top:2px}
+.dc-planned{font-size:13px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1}
+.dc-actual{font-size:11px;font-family:var(--mono);color:var(--gr);margin-top:2px;font-weight:600}
+.dc-type{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.dc-shoe{font-size:8px;color:var(--mut);margin-top:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-edit{position:absolute;top:3px;right:3px;font-size:9px;opacity:0;background:var(--sur);border:1px solid var(--bdr);border-radius:4px;padding:1px 4px;color:var(--mut);transition:opacity .12s}
+.dc:hover .dc-edit{opacity:1}
+
+/* ── WORKOUT BOX ── */
+.wo-box{background:var(--sur2);border-radius:var(--r);padding:10px 13px;font-size:12px;line-height:1.6;color:var(--mut)}
+.wo-box b{color:var(--txt);font-weight:500}
+.wo-r{margin-bottom:3px}.wo-r:last-child{margin-bottom:0}
+
+/* ── BUTTONS ── */
+.btn{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:8px 15px;font-size:13px;color:var(--txt);transition:all .12s;white-space:nowrap}
+.btn:hover{border-color:var(--acc)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-acc{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500}
+.btn-acc:hover{opacity:.9;border-color:var(--acc)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-icon{padding:6px 10px;font-size:14px}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:24px;width:100%;max-width:480px;box-shadow:var(--shadow);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:16px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.form-row{margin-bottom:14px}
+.form-row label{display:block;font-size:12px;color:var(--mut);margin-bottom:5px;font-weight:500}
+.form-row input,.form-row select,.form-row textarea{width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:9px 12px;font-size:13px;color:var(--txt);transition:border-color .12s}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--acc)}
+.form-row textarea{resize:vertical;min-height:70px}
+.color-row{display:flex;gap:8px;flex-wrap:wrap}
+.color-swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .1s}
+.color-swatch.on{border-color:var(--txt);transform:scale(1.15)}
+.color-input{width:40px;height:28px;border-radius:var(--r);border:1px solid var(--bdr);padding:0 2px;cursor:pointer;background:var(--sur2)}
+
+/* ── RUN TYPE MANAGER ── */
+.run-types-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.rt-chip{display:flex;align-items:center;gap:8px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:8px 10px}
+.rt-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.rt-name{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-del{font-size:14px;color:var(--mut);background:none;border:none;padding:0 2px;line-height:1}
+.rt-del:hover{color:var(--rd)}
+
+/* ── STRAVA PANE ── */
+.strava-connect{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:20px;margin-bottom:16px}
+.strava-connect h3{font-size:14px;font-weight:600;margin-bottom:8px}
+.strava-connect p{font-size:13px;color:var(--mut);margin-bottom:12px;line-height:1.6}
+.tok-row{display:flex;gap:8px;flex-wrap:wrap}
+.tok-inp{flex:1;min-width:200px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:9px 12px;font-size:13px;color:var(--txt)}
+.tok-inp:focus{outline:none;border-color:var(--acc)}
+.tok-inp::placeholder{color:var(--mut)}
+.connected-bar{display:flex;align-items:center;gap:10px;background:rgba(62,207,142,.1);border:1px solid rgba(62,207,142,.3);border-radius:var(--r);padding:10px 14px;margin-bottom:16px}
+.connected-dot{width:8px;height:8px;border-radius:50%;background:var(--gr)}
+.act-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:14px 16px;margin-bottom:9px}
+.act-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.act-name-edit{font-size:14px;font-weight:600;color:var(--txt);background:none;border:none;padding:0;width:100%;cursor:text}
+.act-name-edit:focus{outline:none;border-bottom:1px solid var(--acc)}
+.act-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mut);margin-bottom:10px;font-family:var(--mono)}
+.act-shoe-sel{font-size:12px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:4px 8px;color:var(--txt);margin-bottom:8px}
+.act-shoe-sel:focus{outline:none;border-color:var(--acc)}
+.fb{background:var(--sur2);border-left:3px solid var(--acc);border-radius:0 var(--r) var(--r) 0;padding:11px 14px;font-size:13px;line-height:1.65;color:var(--txt);margin-top:10px;display:none}
+.fb.show{display:block}
+.fb.load{color:var(--mut);font-style:italic}
+.stat-line{font-size:12px;color:var(--mut);margin-bottom:10px;min-height:16px}
+.stat-line.err{color:var(--rd)}
+
+/* ── RACE PREDICTIONS ── */
+.pred-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:10px}
+.pred-card h4{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.pred-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.pred-item{background:var(--sur2);border-radius:var(--r);padding:12px}
+.pred-dist{font-size:11px;color:var(--mut);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+.pred-time{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--txt)}
+.pred-pace{font-size:11px;color:var(--mut);margin-top:2px;font-family:var(--mono)}
+
+/* ── CHART ── */
+.chart-wrap{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:20px;margin-bottom:16px}
+.chart-wrap h3{font-size:14px;font-weight:600;margin-bottom:16px}
+.chart-svg{width:100%;overflow:visible}
+
+/* ── SHOES ── */
+.shoes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.shoe-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px}
+.shoe-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.shoe-name{font-size:14px;font-weight:600}
+.shoe-cat{font-size:11px;color:var(--mut);margin-top:2px}
+.shoe-miles{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--acc);line-height:1}
+.shoe-miles-lbl{font-size:11px;color:var(--mut);margin-top:3px}
+.shoe-bar-wrap{height:5px;background:var(--sur2);border-radius:3px;overflow:hidden;margin-top:10px}
+.shoe-bar{height:100%;border-radius:3px;background:var(--acc);transition:width .5s}
+.shoe-del{background:none;border:none;color:var(--mut);font-size:14px;padding:2px}
+.shoe-del:hover{color:var(--rd)}
+
+/* ── PHASE EDITOR ── */
+.phase-editor{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px}
+.phase-editor h4{font-size:13px;font-weight:600;margin-bottom:12px}
+.phase-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.phase-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.phase-label{font-size:13px;font-weight:500;min-width:60px}
+.phase-range{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+.phase-range input{width:54px;background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:5px 8px;font-size:12px;color:var(--txt);text-align:center}
+.phase-range input:focus{outline:none;border-color:var(--acc)}
+
+/* ── NOTIFICATIONS ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 16px;font-size:13px;box-shadow:var(--shadow);z-index:2000;transform:translateY(80px);opacity:0;transition:all .25s}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{border-color:var(--gr);color:var(--gr)}
+.toast.err{border-color:var(--rd);color:var(--rd)}
+
+/* ── UTIL ── */
+.sep{height:1px;background:var(--bdr);margin:16px 0}
+.flex-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ml-auto{margin-left:auto}
+.hide{display:none!important}
+
+@media(max-width:640px){
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .day-grid{gap:3px}
+  .dc{min-height:56px;padding:6px 2px}
+  .dc-planned{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Philly Marathon Dashboard</h1>
+    <div class="race-info">
+      <div class="race-date" id="race-date-display">November 21, 2026</div>
+      <div class="goal-display">
+        <div class="goal-time" id="goal-display">2:50:00</div>
+        <div class="goal-pace" id="pace-display">6:27/mi</div>
+        <button class="edit-goal-btn" onclick="openGoalModal()">Edit goal</button>
+      </div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="countdown" id="countdown"></div>
+    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+  </div>
+</div>
+
+<!-- METRICS -->
+<div class="metrics">
+  <div class="met"><div class="met-l">Block miles</div><div class="met-v">727</div><div class="met-s">planned total</div></div>
+  <div class="met"><div class="met-l">This week</div><div class="met-v" id="m-mpw">—</div><div class="met-s">mile goal</div></div>
+  <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of 22</div></div>
+  <div class="met"><div class="met-l">Completed</div><div class="met-v" id="m-done">—</div><div class="met-s">miles logged</div></div>
+  <div class="met"><div class="met-l">Progress</div><div class="met-v" id="m-pct">—</div><div class="met-s"><div class="prog"><div class="prog-f" id="pbar" style="width:0%"></div></div></div></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on" onclick="showTab('block',this)">Training Block</button>
+  <button class="tab" onclick="showTab('chart',this)">Mileage Chart</button>
+  <button class="tab" onclick="showTab('shoes',this)">Shoes</button>
+  <button class="tab" onclick="showTab('strava',this)">Strava</button>
+</div>
+
+<!-- ═══ TRAINING BLOCK ═══ -->
+<div class="pane on" id="pane-block">
+  <div class="flex-row" style="margin-bottom:14px">
+    <div class="phase-bar" id="phase-bar">
+      <button class="phase-btn on" data-phase="all" onclick="filterPhase('all',this)">All weeks</button>
+      <button class="phase-btn" data-phase="base" onclick="filterPhase('base',this)">Base</button>
+      <button class="phase-btn" data-phase="build" onclick="filterPhase('build',this)">Build</button>
+      <button class="phase-btn" data-phase="peak" onclick="filterPhase('peak',this)">Peak</button>
+      <button class="phase-btn" data-phase="taper" onclick="filterPhase('taper',this)">Taper</button>
+      <button class="phase-edit-btn btn" onclick="openPhaseEditor()">Edit phases</button>
+    </div>
+  </div>
+
+  <div class="view-toggle">
+    <button class="vbtn on" id="vbtn-week" onclick="setView('week',this)">Week view</button>
+    <button class="vbtn" id="vbtn-all" onclick="setView('all',this)">All weeks</button>
+  </div>
+
+  <div class="week-strip" id="week-strip"></div>
+
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn btn-sm" onclick="openRunTypeManager()">⚙ Run types & colors</button>
+    <button class="btn btn-sm" id="sheet-refresh-btn" onclick="refreshFromSheet()">↻ Refresh sheet</button>
+    <span id="sheet-status-inline" style="font-size:12px;color:var(--mut);align-self:center"></span>
+  </div>
+
+  <div id="block-content"></div>
+</div>
+
+<!-- ═══ MILEAGE CHART ═══ -->
+<div class="pane" id="pane-chart">
+  <div class="chart-wrap">
+    <h3>Weekly mileage — planned vs actual</h3>
+    <div style="overflow-x:auto">
+      <svg id="chart-svg" class="chart-svg" height="260"></svg>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <h3>Cumulative miles</h3>
+    <div style="overflow-x:auto">
+      <svg id="chart-cum" class="chart-svg" height="200"></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SHOES ═══ -->
+<div class="pane" id="pane-shoes">
+  <div class="flex-row" style="margin-bottom:16px">
+    <h3 style="font-size:16px;font-weight:600">Shoe tracker</h3>
+    <button class="btn btn-sm ml-auto" onclick="openAddShoe()">+ Add shoe</button>
+  </div>
+  <div class="shoes-grid" id="shoes-grid"></div>
+  <p style="font-size:12px;color:var(--mut);margin-top:8px">Select a shoe on each Strava activity to track mileage automatically.</p>
+</div>
+
+<!-- ═══ STRAVA ═══ -->
+<div class="pane" id="pane-strava">
+  <div class="strava-connect" id="strava-connect-section">
+    <h3>Connect Strava</h3>
+    <p>Paste your Strava access token to load activities. Get one at <a href="https://www.strava.com/settings/api" target="_blank">strava.com/settings/api</a> — needs <code style="font-family:var(--mono);font-size:12px">activity:read_all</code> scope.</p>
+    <div class="tok-row">
+      <input class="tok-inp" id="tok" type="password" placeholder="Access token…" onkeydown="if(event.key==='Enter')connectStrava()"/>
+      <button class="btn btn-acc" onclick="connectStrava()">Connect</button>
+    </div>
+    <div class="stat-line err" id="tok-err"></div>
+  </div>
+
+  <div id="strava-connected" class="hide">
+    <div class="connected-bar">
+      <div class="connected-dot"></div>
+      <span style="font-size:13px;font-weight:500;color:var(--gr)">Connected to Strava</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="loadActivities()" id="refresh-acts-btn">↻ Refresh</button>
+        <button class="btn btn-sm" onclick="analyzeAll()" id="analyze-all-btn">✦ Analyze all</button>
+        <button class="btn btn-sm" onclick="disconnectStrava()" style="color:var(--mut)">Disconnect</button>
+      </div>
+    </div>
+    <div class="stat-line" id="acts-status"></div>
+
+    <!-- Race predictions -->
+    <div class="pred-card" id="pred-card" style="display:none">
+      <h4>Race predictions based on recent training</h4>
+      <div class="pred-grid" id="pred-grid"></div>
+    </div>
+
+    <div id="acts-list"></div>
+  </div>
+</div>
+
+</div><!-- end .app -->
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Goal time modal -->
+<div class="modal-overlay" id="modal-goal">
+  <div class="modal">
+    <h3>Edit goal time</h3>
+    <div class="form-row">
+      <label>Goal time (h:mm:ss)</label>
+      <input type="text" id="goal-input" placeholder="2:50:00"/>
+    </div>
+    <div class="form-row">
+      <label>Race date</label>
+      <input type="date" id="race-date-input" value="2026-11-21"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-goal')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveGoal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day edit modal -->
+<div class="modal-overlay" id="modal-day">
+  <div class="modal">
+    <h3 id="modal-day-title">Edit day</h3>
+    <div class="form-row">
+      <label>Planned miles</label>
+      <input type="number" id="day-miles" step="0.1" min="0"/>
+    </div>
+    <div class="form-row">
+      <label>Run type</label>
+      <select id="day-type">
+        <option value="">— Select type —</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Notes / workout</label>
+      <textarea id="day-notes"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-day')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveDayEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Run type manager modal -->
+<div class="modal-overlay" id="modal-runtypes">
+  <div class="modal">
+    <h3>Run types & colors</h3>
+    <div class="run-types-grid" id="runtypes-grid"></div>
+    <div class="sep"></div>
+    <div class="form-row">
+      <label>Add new run type</label>
+      <div class="flex-row">
+        <input type="text" id="new-rt-name" placeholder="e.g. Tempo" style="flex:1"/>
+        <input type="color" id="new-rt-color" value="#4D9EFF" class="color-input"/>
+        <button class="btn btn-sm" onclick="addRunType()">Add</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-acc" onclick="closeModal('modal-runtypes')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phase editor modal -->
+<div class="modal-overlay" id="modal-phases">
+  <div class="modal">
+    <h3>Edit training phases</h3>
+    <p style="font-size:12px;color:var(--mut);margin-bottom:14px">Set which weeks belong to each phase. Phases can overlap — a week takes its first matching phase.</p>
+    <div id="phase-editor-rows"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-phases')">Cancel</button>
+      <button class="btn btn-acc" onclick="savePhases()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add shoe modal -->
+<div class="modal-overlay" id="modal-shoe">
+  <div class="modal">
+    <h3>Add shoe</h3>
+    <div class="form-row">
+      <label>Shoe name</label>
+      <input type="text" id="shoe-name-inp" placeholder="e.g. Nike Vaporfly 3.2"/>
+    </div>
+    <div class="form-row">
+      <label>Category</label>
+      <select id="shoe-cat-inp">
+        <option value="Race">Race</option>
+        <option value="Workout">Workout</option>
+        <option value="Long run">Long run</option>
+        <option value="Easy / daily">Easy / daily</option>
+        <option value="Recovery">Recovery</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Starting miles (if already used)</label>
+      <input type="number" id="shoe-miles-inp" value="0" min="0" step="0.1"/>
+    </div>
+    <div class="form-row">
+      <label>Max miles (for wear indicator)</label>
+      <input type="number" id="shoe-max-inp" value="400" min="1"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-shoe')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveShoe()">Add shoe</button>
+    </div>
+  </div>
+</div>
+
+<!-- Activity edit modal -->
+<div class="modal-overlay" id="modal-act">
+  <div class="modal">
+    <h3>Edit activity</h3>
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="act-name-inp"/>
+    </div>
+    <div class="form-row">
+      <label>Run type</label>
+      <select id="act-type-inp"></select>
+    </div>
+    <div class="form-row">
+      <label>Shoe</label>
+      <select id="act-shoe-inp"></select>
+    </div>
+    <div class="form-row">
+      <label>Notes</label>
+      <textarea id="act-notes-inp"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-act')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveActEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
+const RACE_DATE_DEFAULT = "2026-11-21";
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let WEEKS = [];
+let stravaToken = null;
+let loadedRuns = [];
+let editingActIdx = null;
+let editingDayKey = null; // "weekN-dayI"
+
+const STATE = {
+  goal:      ls("goal")      || "2:50:00",
+  raceDate:  ls("raceDate")  || RACE_DATE_DEFAULT,
+  theme:     ls("theme")     || "dark",
+  runTypes:  lsJ("runTypes") || [
+    {id:"easy",    name:"Easy",          color:"#6B7494"},
+    {id:"workout", name:"Workout",       color:"#3ECF8E"},
+    {id:"long",    name:"Long run",      color:"#9B7FEA"},
+    {id:"mp",      name:"Marathon pace", color:"#F59E0B"},
+    {id:"race",    name:"Race",          color:"#4D9EFF"},
+    {id:"recovery",name:"Recovery",      color:"#F05252"},
+    {id:"double",  name:"Double",        color:"#FF6B35"},
+  ],
+  phases: lsJ("phases") || [
+    {id:"base",  name:"Base",  color:"#3ECF8E", wkStart:1,  wkEnd:6},
+    {id:"build", name:"Build", color:"#4D9EFF", wkStart:7,  wkEnd:14},
+    {id:"peak",  name:"Peak",  color:"#9B7FEA", wkStart:15, wkEnd:19},
+    {id:"taper", name:"Taper", color:"#F59E0B", wkStart:20, wkEnd:22},
+  ],
+  shoes:    lsJ("shoes")    || [
+    {id:"peg42",   name:"Nike Peg 42",       cat:"Easy / daily", miles:0, max:500},
+    {id:"nb1080",  name:"NB 1080 V15",       cat:"Recovery",     miles:0, max:500},
+    {id:"rebel",   name:"NB Rebel V5",       cat:"Workout",      miles:0, max:400},
+    {id:"superb",  name:"ASICS Superblast 3",cat:"Long run",     miles:0, max:400},
+    {id:"vfly",    name:"Vaporfly 3.2",      cat:"Race",         miles:0, max:200},
+    {id:"rocketx", name:"HOKA Rocket X3",    cat:"Race",         miles:0, max:200},
+  ],
+  dayOverrides: lsJ("dayOverrides") || {}, // key: "wN-dI" → {type, notes, actualMiles, shoe}
+  actEdits:     lsJ("actEdits")     || {}, // key: stravaId → {name, type, shoe, notes}
+};
+
+function ls(k)  { try { return localStorage.getItem("pm_"+k); } catch(e) { return null; } }
+function lsJ(k) { try { const v=localStorage.getItem("pm_"+k); return v?JSON.parse(v):null; } catch(e) { return null; } }
+function save(k,v){ try { localStorage.setItem("pm_"+k, typeof v==="string"?v:JSON.stringify(v)); } catch(e){} }
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+const fmtPace = s => { if(!s||s<=0)return"—"; const v=1609.34/s,mn=Math.floor(v/60),sc=Math.round(v%60); return`${mn}:${sc.toString().padStart(2,"0")}/mi`; };
+const fmtDist = m => (m/1609.34).toFixed(2);
+const fmtTime = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60; return h?`${h}h ${m}m`:`${m}m ${sc}s`; };
+const fmtDate = s => { try{return new Date(s).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});}catch{return s;} };
+const wkStart = w => new Date((w.mon||w.dates||"2026-06-22")+"T00:00:00");
+
+function goalToSecs(str) {
+  const p=str.trim().split(":").map(Number);
+  if(p.length===3) return p[0]*3600+p[1]*60+p[2];
+  if(p.length===2) return p[0]*3600+p[1]*60;
+  return 10200; // default 2:50
+}
+function calcPace(goalStr, distMiles=26.2188) {
+  const secs = goalToSecs(goalStr);
+  const secPerMile = secs / distMiles;
+  const mn = Math.floor(secPerMile/60), sc = Math.round(secPerMile%60);
+  return `${mn}:${sc.toString().padStart(2,"0")}/mi`;
+}
+function secsToHMS(s) {
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.round(s%60);
+  return `${h}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;
+}
+function getRunType(id) { return STATE.runTypes.find(r=>r.id===id); }
+function getPhaseForWeek(n) { return STATE.phases.find(p=>n>=p.wkStart&&n<=p.wkEnd); }
+function getShoe(id) { return STATE.shoes.find(s=>s.id===id); }
+function curWeekIdx() { const t=new Date(); for(let i=WEEKS.length-1;i>=0;i--) { if(t>=wkStart(WEEKS[i])) return i; } return 0; }
+function getDayKey(wn, di) { return `w${wn}-d${di}`; }
+function getOverride(wn, di) { return STATE.dayOverrides[getDayKey(wn,di)] || {}; }
+function totalActualMiles() {
+  let t=0;
+  Object.values(STATE.dayOverrides).forEach(o=>{ if(o.actualMiles) t+=parseFloat(o.actualMiles)||0; });
+  loadedRuns.forEach(r=>{ t+=parseFloat(fmtDist(r.distance||0))||0; });
+  return t.toFixed(1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════════════
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  document.getElementById("theme-btn").textContent = t==="dark" ? "☀️ Light" : "🌙 Dark";
+  STATE.theme = t; save("theme", t);
+}
+function toggleTheme() { applyTheme(STATE.theme==="dark"?"light":"dark"); }
+
+// ═══════════════════════════════════════════════════════════
+// GOAL / COUNTDOWN
+// ═══════════════════════════════════════════════════════════
+function updateGoalDisplay() {
+  document.getElementById("goal-display").textContent = STATE.goal;
+  document.getElementById("pace-display").textContent = calcPace(STATE.goal);
+  const rd = new Date(STATE.raceDate+"T00:00:00");
+  document.getElementById("race-date-display").textContent = rd.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+  const days = Math.max(0,Math.ceil((rd-new Date())/86400000));
+  document.getElementById("countdown").innerHTML = `<span>${days}</span> days to Philly`;
+}
+function openGoalModal() {
+  document.getElementById("goal-input").value = STATE.goal;
+  document.getElementById("race-date-input").value = STATE.raceDate;
+  openModal("modal-goal");
+}
+function saveGoal() {
+  STATE.goal = document.getElementById("goal-input").value.trim() || "2:50:00";
+  STATE.raceDate = document.getElementById("race-date-input").value || RACE_DATE_DEFAULT;
+  save("goal", STATE.goal); save("raceDate", STATE.raceDate);
+  updateGoalDisplay(); closeModal("modal-goal"); toast("Goal updated","ok");
+}
+
+// ═══════════════════════════════════════════════════════════
+// SHEET FETCH
+// ═══════════════════════════════════════════════════════════
+const FALLBACK_WEEKS = [
+  {n:1,mon:"2026-06-22",dates:"Jun 22–28",mpw:30,days:["OFF","10","4","3","OFF","3","10"],w1:"DTRC workout",w2:"2×1600m @ Threshold + 4×200m @ Interval",w3:"",mp:"",race:"Macklind Mile"},
+  {n:2,mon:"2026-06-29",dates:"Jun 29–Jul 5",mpw:35,days:["OFF","12","4","3","5","OFF","11"],w1:"DTRC workout",w2:"3×800m @ Threshold + 3×800m @ Interval",w3:"",mp:"",race:""},
+  {n:3,mon:"2026-07-06",dates:"Jul 6–12",mpw:40,days:["OFF","12","7","3","6","OFF","12"],w1:"DTRC workout",w2:"4×400m @ Threshold + 4×400m @ Interval",w3:"",mp:"",race:""},
+  {n:4,mon:"2026-07-13",dates:"Jul 13–19",mpw:44,days:["OFF","12","7","3","8","OFF","14"],w1:"DTRC workout",w2:"4×1000m @ Interval + 1×400m @ Repetition",w3:"",mp:"",race:""},
+  {n:5,mon:"2026-07-20",dates:"Jul 20–26",mpw:48,days:["OFF","12","7","4","10","OFF","15"],w1:"DTRC workout",w2:"4×400m @ Interval + 3×400m @ Repetition",w3:"",mp:"6 miles at MP",race:""},
+  {n:6,mon:"2026-07-27",dates:"Jul 27–Aug 2",mpw:47,days:["OFF","12","6","4","10","OFF","15"],w1:"DTRC workout",w2:"",w3:"2 mi WU · 2×3 mi @ Threshold / 4 min rest · 2 mi CD",mp:"",race:""},
+  {n:7,mon:"2026-08-03",dates:"Aug 3–9",mpw:50,days:["5","13","8","5","10","OFF","14"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:8,mon:"2026-08-10",dates:"Aug 10–16",mpw:55,days:["5","14","8","5","9","OFF","14"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:9,mon:"2026-08-17",dates:"Aug 17–23",mpw:57,days:["5","14","9","5","9","OFF","15"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:10,mon:"2026-08-24",dates:"Aug 24–30",mpw:60,days:["5","15","9","5","9","OFF","17"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:11,mon:"2026-08-31",dates:"Aug 31–Sep 6",mpw:62,days:["5","15","9","5","10","OFF","18"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:12,mon:"2026-09-07",dates:"Sep 7–13",mpw:60,days:["5","14","9","5","9","8","10"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:13,mon:"2026-09-14",dates:"Sep 14–20",mpw:63,days:["5","15","9","5","10","8","11"],w1:"",w2:"",w3:"",mp:"",race:""},
+  {n:14,mon:"2026-09-21",dates:"Sep 21–27",mpw:65,days:["5","16","8","5","9","5","17"],w1:"",w2:"",w3:"",mp:"17 mi — last 3 at goal MP",race:""},
+  {n:15,mon:"2026-09-28",dates:"Sep 28–Oct 4",mpw:65,days:["5","16","8","5","8","5","18"],w1:"2 mi WU · 7×1 mi @ Threshold · 2 mi CD",w2:"2 mi WU · 4×400 @ 5k + 4×400 @ mile pace · 2 mi CD",w3:"",mp:"18 mi — last 6 at goal MP",race:""},
+  {n:16,mon:"2026-10-05",dates:"Oct 5–11",mpw:65,days:["9","11","10","5","8","8","14"],w1:"2 mi WU · 10×800 @ 10k · 2 mi CD",w2:"",w3:"",mp:"2 mi WU · 10 mi at goal MP · 2 mi CD",race:""},
+  {n:17,mon:"2026-10-12",dates:"Oct 12–18",mpw:70,days:["5","16","10","5","7","9","18"],w1:"2 mi WU · 2×4 mi @ Threshold · 1 mi FAST · 2 mi CD",w2:"2 mi WU · 10×30 sec uphill · CD to 7 mi",w3:"",mp:"",race:""},
+  {n:18,mon:"2026-10-19",dates:"Oct 19–25",mpw:70,days:["5","17","10","5","7","9","17"],w1:"2 mi WU · 3 mi @ Threshold · 2×800 @ 10k · 4×400 @ 5k · 2 mi CD",w2:"",w3:"",mp:"2 mi WU · 13 mi at goal MP · 2 mi CD",race:"Great GO! Halloween Race"},
+  {n:19,mon:"2026-10-26",dates:"Oct 26–Nov 1",mpw:75,days:["5","16","10","5","10","9","20"],w1:"2 mi WU · 8×1 mi @ Threshold · 2 mi CD",w2:"",w3:"",mp:"",race:""},
+  {n:20,mon:"2026-11-02",dates:"Nov 2–8",mpw:55,days:["5","10","8","7","7","OFF","18"],w1:"2 mi WU · 10×1k @ 10k · 2 mi CD",w2:"2 mi WU · 8×20 sec fast · CD to 7 mi",w3:"",mp:"2 mi WU · 14 mi at goal MP · 2 mi CD",race:""},
+  {n:21,mon:"2026-11-09",dates:"Nov 9–15",mpw:42,days:["6","8","6","5","6","OFF","11"],w1:"2 mi WU · 8×800 @ LT · 2 mi CD",w2:"2 mi WU · 4×400 @ mile pace · 2 mi CD",w3:"",mp:"",race:""},
+  {n:22,mon:"2026-11-16",dates:"Nov 16–21",mpw:41,days:["OFF","5","4","3","OFF","3","26.2"],w1:"2 mi WU · 2 mi @ goal MP · 4×400 @ 10k · 1 mi CD",w2:"",w3:"",mp:"",race:"Philadelphia Marathon"},
+];
+
+async function loadFromSheet() {
+  const el = document.getElementById("sheet-status-inline");
+  el.textContent = "Loading sheet…";
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?action=plan");
+    const data = await res.json();
+    if (data.weeks && data.weeks.length > 0) {
+      WEEKS = data.weeks;
+      el.textContent = "✓ Sheet loaded (" + WEEKS.length + " weeks)";
+      el.style.color = "var(--gr)";
+    } else throw new Error("empty");
+  } catch(e) {
+    WEEKS = FALLBACK_WEEKS;
+    el.textContent = "Sheet unavailable — using built-in data";
+    el.style.color = "var(--mut)";
+  }
+}
+
+async function refreshFromSheet() {
+  const btn = document.getElementById("sheet-refresh-btn");
+  btn.disabled = true; btn.textContent = "Refreshing…";
+  await loadFromSheet();
+  renderBlock();
+  btn.disabled = false; btn.textContent = "↻ Refresh sheet";
+  toast("Sheet refreshed");
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRAINING BLOCK RENDER
+// ═══════════════════════════════════════════════════════════
+const DN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+let currentView = "week"; // "week" | "all"
+let currentPhaseFilter = "all";
+let selectedWeekIdx = null;
+
+function buildWeekStrip() {
+  const strip = document.getElementById("week-strip");
+  const ci = curWeekIdx();
+  strip.innerHTML = "";
+  WEEKS.forEach((w,i) => {
+    const b = document.createElement("button");
+    const phase = getPhaseForWeek(w.n);
+    b.className = "wchip" + (i===ci?" on":"") + (i<ci?" past":"");
+    if (phase) b.style.borderColor = (i===ci) ? phase.color : "";
+    b.textContent = "Wk " + w.n;
+    b.onclick = () => {
+      selectedWeekIdx = i;
+      document.querySelectorAll(".wchip").forEach((x,j) => x.classList.toggle("on", j===i));
+      renderBlock();
+    };
+    strip.appendChild(b);
+  });
+}
+
+function setView(v, btn) {
+  currentView = v;
+  document.querySelectorAll(".vbtn").forEach(b => b.classList.remove("on"));
+  btn.classList.add("on");
+  renderBlock();
+}
+
+function filterPhase(phase, btn) {
+  currentPhaseFilter = phase;
+  document.querySelectorAll(".phase-btn").forEach(b => b.classList.remove("on"));
+  btn.classList.add("on");
+  renderBlock();
+}
+
+function getVisibleWeeks() {
+  let weeks = WEEKS;
+  if (currentPhaseFilter !== "all") {
+    const ph = STATE.phases.find(p => p.id === currentPhaseFilter);
+    if (ph) weeks = weeks.filter(w => w.n >= ph.wkStart && w.n <= ph.wkEnd);
+  }
+  if (currentView === "week") {
+    const idx = selectedWeekIdx !== null ? selectedWeekIdx : curWeekIdx();
+    return [weeks.find((w,i) => WEEKS.indexOf(w) === idx) || weeks[0]].filter(Boolean);
+  }
+  return weeks;
+}
+
+function renderBlock() {
+  const container = document.getElementById("block-content");
+  container.innerHTML = "";
+  const ci = curWeekIdx();
+  const visWeeks = getVisibleWeeks();
+
+  visWeeks.forEach(w => {
+    const globalIdx = WEEKS.indexOf(w);
+    const isCur = globalIdx === ci;
+    const phase = getPhaseForWeek(w.n);
+
+    const card = document.createElement("div");
+    card.className = "week-card" + (isCur ? " cur-week" : "");
+
+    let phaseBadge = "";
+    if (phase) phaseBadge = `<span class="phase-badge" style="color:${phase.color};border-color:${phase.color};background:${phase.color}22">${phase.name}</span>`;
+
+    // calc actual miles for this week
+    let actualTotal = 0;
+    w.days.forEach((mi, di) => {
+      const ov = getOverride(w.n, di);
+      if (ov.actualMiles) actualTotal += parseFloat(ov.actualMiles)||0;
+    });
+    const actualStr = actualTotal > 0 ? `<span class="wk-mpw-actual">${actualTotal.toFixed(1)} actual</span>` : "";
+
+    card.innerHTML = `
+      <div class="wk-hdr">
+        <div class="wk-title">
+          Week ${w.n}
+          <span class="wk-dates">${w.dates||""}</span>
+          ${isCur ? '<span class="cur-badge">This week</span>' : ""}
+          ${phaseBadge}
+        </div>
+        <div class="wk-mpw">${w.mpw} mi goal ${actualStr}</div>
+      </div>
+      <div class="day-grid" id="dg-${w.n}"></div>
+      <div id="wo-${w.n}"></div>`;
+
+    container.appendChild(card);
+
+    // Render day cells
+    const grid = document.getElementById("dg-" + w.n);
+    w.days.forEach((mi, di) => {
+      const ov = getOverride(w.n, di);
+      const rt = getRunType(ov.type || guessRunType(w, di));
+      const planned = mi === "OFF" ? "—" : (mi+"").replace("ø","");
+      const actual = ov.actualMiles ? ov.actualMiles + " mi" : "";
+      const shoe = ov.shoe ? (getShoe(ov.shoe)||{name:""}).name : "";
+
+      const cell = document.createElement("div");
+      cell.className = "dc" + (mi==="OFF" ? " rest" : "");
+      if (rt) cell.style.borderColor = rt.color + "88";
+      if (rt && mi !== "OFF") cell.style.background = rt.color + "18";
+      cell.dataset.wn = w.n; cell.dataset.di = di;
+      cell.innerHTML = `
+        <button class="dc-edit" onclick="openDayEdit(${w.n},${di},event)">✎</button>
+        <div class="dc-day">${DN[di]}</div>
+        <div class="dc-planned">${planned}</div>
+        ${actual ? `<div class="dc-actual">${actual}</div>` : ""}
+        ${rt && mi!=="OFF" ? `<div class="dc-type" style="color:${rt.color}">${rt.name}</div>` : ""}
+        ${shoe ? `<div class="dc-shoe">${shoe}</div>` : ""}`;
+      cell.onclick = (e) => { if (!e.target.classList.contains("dc-edit")) openDayEdit(w.n, di, e); };
+      grid.appendChild(cell);
+    });
+
+    // Workout details
+    const wos = [];
+    if (w.w1) wos.push({l:"Tue AM", t:w.w1});
+    if (w.w2) wos.push({l:"Tue PM", t:w.w2});
+    if (w.w3) wos.push({l:"Fri PM", t:w.w3});
+    if (w.mp) wos.push({l:"MP run",  t:w.mp});
+    if (w.race) wos.push({l:"Race",  t:w.race});
+    if (wos.length) {
+      const wb = document.getElementById("wo-" + w.n);
+      wb.innerHTML = `<div class="wo-box">${wos.map(x=>`<div class="wo-r"><b>${x.l}:</b> ${x.t}</div>`).join("")}</div>`;
+    }
+  });
+
+  // Show "next weeks" button in week view
+  if (currentView === "week" && visWeeks.length > 0) {
+    const curIdx2 = selectedWeekIdx !== null ? selectedWeekIdx : curWeekIdx();
+    if (curIdx2 < WEEKS.length - 1) {
+      const btn = document.createElement("button");
+      btn.className = "btn"; btn.style.cssText = "width:100%;margin-top:8px";
+      btn.textContent = "Next week →";
+      btn.onclick = () => {
+        const newIdx = Math.min(curIdx2 + 1, WEEKS.length - 1);
+        selectedWeekIdx = newIdx;
+        document.querySelectorAll(".wchip").forEach((x,j) => x.classList.toggle("on", j===newIdx));
+        renderBlock();
+      };
+      container.appendChild(btn);
+    }
+  }
+
+  updateMetrics();
+  renderChart();
+}
+
+function guessRunType(w, di) {
+  const mi = w.days[di];
+  if (mi === "OFF") return null;
+  if (w.race && di === 6 && (mi+"").includes("26")) return "race";
+  if (di === 6) return "long";
+  if (di === 1 && (w.w1 || w.w2)) return "workout";
+  if (di === 4 && w.w3) return "workout";
+  if (w.mp && di === 5) return "mp";
+  return "easy";
+}
+
+// ═══════════════════════════════════════════════════════════
+// DAY EDIT
+// ═══════════════════════════════════════════════════════════
+function openDayEdit(wn, di, e) {
+  e && e.stopPropagation();
+  editingDayKey = getDayKey(wn, di);
+  const w = WEEKS.find(x => x.n === wn);
+  const ov = getOverride(wn, di);
+  const planned = (w.days[di]||"").replace("ø","").replace("OFF","0");
+
+  document.getElementById("modal-day-title").textContent = `Week ${wn} · ${DN[di]}`;
+  document.getElementById("day-miles").value = ov.actualMiles || planned || "";
+  document.getElementById("day-notes").value = ov.notes || w.w1 || "";
+
+  const sel = document.getElementById("day-type");
+  sel.innerHTML = `<option value="">— Select type —</option>` +
+    STATE.runTypes.map(rt => `<option value="${rt.id}" ${(ov.type||guessRunType(w,di))===rt.id?"selected":""}>${rt.name}</option>`).join("");
+
+  openModal("modal-day");
+}
+
+function saveDayEdit() {
+  if (!editingDayKey) return;
+  const miles = parseFloat(document.getElementById("day-miles").value) || 0;
+  const type  = document.getElementById("day-type").value;
+  const notes = document.getElementById("day-notes").value;
+  STATE.dayOverrides[editingDayKey] = { actualMiles: miles||undefined, type: type||undefined, notes: notes||undefined };
+  save("dayOverrides", STATE.dayOverrides);
+  closeModal("modal-day");
+  renderBlock();
+  toast("Day updated");
+}
+
+// ═══════════════════════════════════════════════════════════
+// RUN TYPE MANAGER
+// ═══════════════════════════════════════════════════════════
+function openRunTypeManager() {
+  renderRunTypesGrid();
+  openModal("modal-runtypes");
+}
+function renderRunTypesGrid() {
+  const g = document.getElementById("runtypes-grid");
+  g.innerHTML = STATE.runTypes.map(rt => `
+    <div class="rt-chip">
+      <span class="rt-dot" style="background:${rt.color}"></span>
+      <input type="color" value="${rt.color}" onchange="updateRTColor('${rt.id}',this.value)" style="width:20px;height:20px;border:none;background:none;cursor:pointer;padding:0;border-radius:3px"/>
+      <span class="rt-name">${rt.name}</span>
+      <button class="rt-del" onclick="deleteRunType('${rt.id}')">✕</button>
+    </div>`).join("");
+}
+function updateRTColor(id, color) {
+  const rt = STATE.runTypes.find(r => r.id===id);
+  if (rt) { rt.color=color; save("runTypes",STATE.runTypes); renderBlock(); }
+}
+function deleteRunType(id) {
+  STATE.runTypes = STATE.runTypes.filter(r => r.id !== id);
+  save("runTypes", STATE.runTypes);
+  renderRunTypesGrid(); renderBlock();
+}
+function addRunType() {
+  const name = document.getElementById("new-rt-name").value.trim();
+  const color = document.getElementById("new-rt-color").value;
+  if (!name) return;
+  const id = name.toLowerCase().replace(/\s+/g,"-") + Date.now();
+  STATE.runTypes.push({id, name, color});
+  save("runTypes", STATE.runTypes);
+  document.getElementById("new-rt-name").value = "";
+  renderRunTypesGrid(); renderBlock();
+  toast("Run type added");
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE EDITOR
+// ═══════════════════════════════════════════════════════════
+function openPhaseEditor() {
+  const rows = document.getElementById("phase-editor-rows");
+  rows.innerHTML = STATE.phases.map(ph => `
+    <div class="phase-row">
+      <span class="phase-dot" style="background:${ph.color}"></span>
+      <span class="phase-label">${ph.name}</span>
+      <div class="phase-range">
+        Wk <input type="number" id="ph-s-${ph.id}" value="${ph.wkStart}" min="1" max="22"/>
+        to
+        <input type="number" id="ph-e-${ph.id}" value="${ph.wkEnd}" min="1" max="22"/>
+      </div>
+      <input type="color" value="${ph.color}" onchange="updatePhaseColor('${ph.id}',this.value)" style="width:28px;height:28px;border:none;background:none;cursor:pointer;border-radius:4px;border:1px solid var(--bdr)"/>
+    </div>`).join("");
+  openModal("modal-phases");
+}
+function updatePhaseColor(id, color) {
+  const ph = STATE.phases.find(p => p.id===id);
+  if (ph) ph.color = color;
+}
+function savePhases() {
+  STATE.phases.forEach(ph => {
+    const s = parseInt(document.getElementById("ph-s-"+ph.id)?.value)||ph.wkStart;
+    const e = parseInt(document.getElementById("ph-e-"+ph.id)?.value)||ph.wkEnd;
+    ph.wkStart=s; ph.wkEnd=e;
+  });
+  save("phases", STATE.phases);
+  closeModal("modal-phases");
+  renderBlock(); buildWeekStrip();
+  toast("Phases saved");
+}
+
+// ═══════════════════════════════════════════════════════════
+// METRICS
+// ═══════════════════════════════════════════════════════════
+function updateMetrics() {
+  const ci = curWeekIdx();
+  const cw = WEEKS[ci] || WEEKS[0] || {};
+  document.getElementById("m-mpw").textContent = cw.mpw || "—";
+  document.getElementById("m-wk").textContent  = cw.n   || "—";
+  document.getElementById("m-done").textContent = totalActualMiles();
+  const pct = WEEKS.length ? Math.round((ci / (WEEKS.length-1)) * 100) : 0;
+  document.getElementById("m-pct").textContent = pct + "%";
+  document.getElementById("pbar").style.width  = pct + "%";
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART
+// ═══════════════════════════════════════════════════════════
+function renderChart() {
+  renderBarChart();
+  renderCumChart();
+}
+
+function renderBarChart() {
+  const svg = document.getElementById("chart-svg");
+  if (!WEEKS.length) return;
+  const W = Math.max(svg.parentElement.clientWidth - 40, 400);
+  const H = 240, pad = {l:40,r:20,t:20,b:40};
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const bw = Math.max(4, (iw / WEEKS.length) - 3);
+  const maxMpw = Math.max(...WEEKS.map(w => w.mpw || 0), 10);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  let html = `<g transform="translate(${pad.l},${pad.t})">`;
+  // grid lines
+  [0,.25,.5,.75,1].forEach(f => {
+    const y = ih*(1-f);
+    const val = Math.round(maxMpw*f);
+    html += `<line x1="0" y1="${y}" x2="${iw}" y2="${y}" stroke="var(--bdr)" stroke-width="1"/>
+             <text x="-6" y="${y+4}" text-anchor="end" fill="var(--mut)" font-size="10">${val}</text>`;
+  });
+
+  const ci = curWeekIdx();
+  WEEKS.forEach((w, i) => {
+    const x = i * (iw / WEEKS.length) + (iw/WEEKS.length - bw) / 2;
+    const ph = getPhaseForWeek(w.n);
+    const color = ph ? ph.color : "var(--acc)";
+    const plannedH = (w.mpw / maxMpw) * ih;
+    const yPlan = ih - plannedH;
+
+    // actual calc
+    let actualMi = 0;
+    w.days.forEach((m,di) => { const ov=getOverride(w.n,di); if(ov.actualMiles) actualMi+=parseFloat(ov.actualMiles)||0; });
+    const actualH = actualMi > 0 ? (actualMi / maxMpw) * ih : 0;
+
+    // planned bar (ghost)
+    html += `<rect x="${x}" y="${yPlan}" width="${bw}" height="${plannedH}" fill="${color}33" rx="2" stroke="${color}55" stroke-width="1"/>`;
+    // actual bar
+    if (actualH > 0) {
+      html += `<rect x="${x}" y="${ih-actualH}" width="${bw}" height="${actualH}" fill="${color}" rx="2" opacity=".9"/>`;
+    }
+    // current week indicator
+    if (i === ci) html += `<rect x="${x-1}" y="0" width="${bw+2}" height="${ih}" fill="var(--acc)" opacity=".06" rx="2"/>`;
+
+    // week label
+    html += `<text x="${x+bw/2}" y="${ih+14}" text-anchor="middle" fill="var(--mut)" font-size="9">${w.n}</text>`;
+  });
+
+  // legend
+  html += `<rect x="${iw-100}" y="-16" width="10" height="10" fill="var(--acc)33" rx="2"/>
+           <text x="${iw-86}" y="-8" fill="var(--mut)" font-size="10">Planned</text>
+           <rect x="${iw-40}" y="-16" width="10" height="10" fill="var(--acc)" rx="2"/>
+           <text x="${iw-26}" y="-8" fill="var(--mut)" font-size="10">Actual</text>`;
+
+  html += `</g>`;
+  svg.innerHTML = html;
+}
+
+function renderCumChart() {
+  const svg = document.getElementById("chart-cum");
+  if (!WEEKS.length) return;
+  const W = Math.max(svg.parentElement.clientWidth - 40, 400);
+  const H = 180, pad = {l:40,r:20,t:10,b:30};
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const totalPlanned = WEEKS.reduce((s,w) => s+(w.mpw||0), 0);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  let plannedCum = 0, actualCum = 0;
+  const pts_p = [], pts_a = [];
+  WEEKS.forEach((w,i) => {
+    plannedCum += w.mpw || 0;
+    let act = 0; w.days.forEach((m,di) => { const ov=getOverride(w.n,di); if(ov.actualMiles) act+=parseFloat(ov.actualMiles)||0; });
+    actualCum += act;
+    const x = (i / (WEEKS.length-1)) * iw;
+    pts_p.push([x, ih - (plannedCum/totalPlanned)*ih]);
+    pts_a.push([x, ih - (actualCum/totalPlanned)*ih]);
+  });
+
+  const pathStr = pts => pts.map((p,i) => (i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  const areaStr = pts => pathStr(pts) + ` L${pts[pts.length-1][0]},${ih} L0,${ih} Z`;
+
+  let html = `<g transform="translate(${pad.l},${pad.t})">`;
+  [0,.5,1].forEach(f=>{
+    const y=ih*(1-f);
+    html+=`<line x1="0" y1="${y}" x2="${iw}" y2="${y}" stroke="var(--bdr)" stroke-width="1"/>
+           <text x="-6" y="${y+4}" text-anchor="end" fill="var(--mut)" font-size="10">${Math.round(totalPlanned*f)}</text>`;
+  });
+  html += `<path d="${areaStr(pts_p)}" fill="var(--bl)" opacity=".1"/>
+           <path d="${pathStr(pts_p)}" fill="none" stroke="var(--bl)" stroke-width="1.5" stroke-dasharray="4 2"/>
+           <path d="${areaStr(pts_a)}" fill="var(--acc)" opacity=".15"/>
+           <path d="${pathStr(pts_a)}" fill="none" stroke="var(--acc)" stroke-width="2"/>`;
+  html += `</g>`;
+  svg.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SHOES
+// ═══════════════════════════════════════════════════════════
+function renderShoes() {
+  const grid = document.getElementById("shoes-grid");
+  grid.innerHTML = "";
+  STATE.shoes.forEach(shoe => {
+    const pct = Math.min(100, Math.round((shoe.miles / shoe.max) * 100));
+    const card = document.createElement("div");
+    card.className = "shoe-card";
+    card.innerHTML = `
+      <div class="shoe-hdr">
+        <div>
+          <div class="shoe-name">${shoe.name}</div>
+          <div class="shoe-cat">${shoe.cat}</div>
+        </div>
+        <button class="shoe-del" onclick="deleteShoe('${shoe.id}')">✕</button>
+      </div>
+      <div class="shoe-miles">${shoe.miles.toFixed(1)}</div>
+      <div class="shoe-miles-lbl">miles of ${shoe.max} max</div>
+      <div class="shoe-bar-wrap"><div class="shoe-bar" style="width:${pct}%;background:${pct>80?"var(--rd)":pct>60?"var(--am)":"var(--acc)"}"></div></div>`;
+    grid.appendChild(card);
+  });
+}
+function openAddShoe() { openModal("modal-shoe"); }
+function saveShoe() {
+  const name  = document.getElementById("shoe-name-inp").value.trim();
+  if (!name) return;
+  const id    = name.toLowerCase().replace(/\s+/g,"-") + Date.now();
+  const cat   = document.getElementById("shoe-cat-inp").value;
+  const miles = parseFloat(document.getElementById("shoe-miles-inp").value)||0;
+  const max   = parseFloat(document.getElementById("shoe-max-inp").value)||400;
+  STATE.shoes.push({id,name,cat,miles,max});
+  save("shoes", STATE.shoes);
+  closeModal("modal-shoe");
+  renderShoes(); toast("Shoe added");
+}
+function deleteShoe(id) {
+  if (!confirm("Remove this shoe?")) return;
+  STATE.shoes = STATE.shoes.filter(s => s.id !== id);
+  save("shoes", STATE.shoes);
+  renderShoes();
+}
+function addMilesToShoe(shoeId, miles) {
+  const shoe = STATE.shoes.find(s => s.id===shoeId);
+  if (shoe) { shoe.miles = parseFloat((shoe.miles + miles).toFixed(2)); save("shoes", STATE.shoes); renderShoes(); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// STRAVA
+// ═══════════════════════════════════════════════════════════
+async function connectStrava() {
+  const tok = document.getElementById("tok").value.trim();
+  const errEl = document.getElementById("tok-err");
+  if (!tok) { errEl.textContent = "Paste your access token first."; return; }
+  errEl.textContent = "";
+  stravaToken = tok;
+  document.getElementById("strava-connect-section").style.display = "none";
+  document.getElementById("strava-connected").classList.remove("hide");
+  loadActivities();
+}
+function disconnectStrava() {
+  stravaToken = null;
+  document.getElementById("strava-connect-section").style.display = "";
+  document.getElementById("strava-connected").classList.add("hide");
+  document.getElementById("tok").value = "";
+  document.getElementById("acts-list").innerHTML = "";
+  document.getElementById("pred-card").style.display = "none";
+}
+function setActsStatus(msg, err=false) {
+  const el = document.getElementById("acts-status");
+  el.textContent = msg; el.className = "stat-line" + (err?" err":"");
+}
+
+async function loadActivities() {
+  const btn = document.getElementById("refresh-acts-btn");
+  btn.disabled = true; btn.textContent = "Loading…";
+  setActsStatus("Fetching from Strava…");
+  document.getElementById("acts-list").innerHTML = "";
+  document.getElementById("pred-card").style.display = "none";
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6", max_tokens:8000,
+        system:"You are a data proxy. Fetch the given URL with the given Authorization header and return ONLY the raw JSON response body — no markdown, no prose.",
+        tools:[{type:"web_search_20250305",name:"web_search"}],
+        messages:[{role:"user",content:`Fetch this URL and return ONLY the raw JSON array:\nGET https://www.strava.com/api/v3/athlete/activities?per_page=20\nAuthorization: Bearer ${stravaToken}`}]
+      })
+    });
+    const data = await res.json();
+    let raw = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+    raw = raw.replace(/^```[a-z]*\n?/i,"").replace(/\n?```$/,"").trim();
+    const s=raw.indexOf("["),e=raw.lastIndexOf("]");
+    if(s===-1||e===-1) throw new Error("Could not parse Strava response — token may be invalid.");
+    const acts = JSON.parse(raw.slice(s,e+1));
+    if(!Array.isArray(acts)) throw new Error("Unexpected response.");
+    loadedRuns = acts.filter(a=>a.type==="Run"||a.sport_type==="Run");
+    if(!loadedRuns.length) { setActsStatus("No recent runs found."); return; }
+    setActsStatus(loadedRuns.length + " runs loaded.");
+    renderActivities(loadedRuns);
+    computePredictions(loadedRuns);
+    updateMetrics();
+  } catch(e) { setActsStatus(e.message, true); }
+  btn.disabled=false; btn.textContent="↻ Refresh";
+}
+
+function shoeOptions(selectedId) {
+  return `<option value="">No shoe selected</option>` +
+    STATE.shoes.map(s=>`<option value="${s.id}" ${s.id===selectedId?"selected":""}>${s.name}</option>`).join("");
+}
+function runTypeOptions(selectedId) {
+  return `<option value="">— Type —</option>` +
+    STATE.runTypes.map(rt=>`<option value="${rt.id}" ${rt.id===selectedId?"selected":""}>${rt.name}</option>`).join("");
+}
+
+function renderActivities(runs) {
+  const list = document.getElementById("acts-list"); list.innerHTML = "";
+  runs.forEach((run, i) => {
+    const edit = STATE.actEdits[run.id] || {};
+    const name = edit.name || run.name;
+    const shoe = edit.shoe || "";
+    const type = edit.type || "";
+    const dist = parseFloat(fmtDist(run.distance||0));
+    const wk = (() => { const d=new Date(run.start_date_local||run.start_date); for(let j=WEEKS.length-1;j>=0;j--) if(d>=wkStart(WEEKS[j])) return WEEKS[j]; return null; })();
+
+    const c = document.createElement("div"); c.className="act-card"; c.dataset.i=i;
+    c.dataset.run = JSON.stringify({id:run.id,name:run.name,date:run.start_date_local||run.start_date,dist:run.distance||0,spd:run.average_speed||0,mv:run.moving_time||0,elev:run.total_elevation_gain||0,hr:run.average_heartrate||0,desc:run.description||""});
+    c.innerHTML = `
+      <div class="act-hdr">
+        <div style="flex:1">
+          <input class="act-name-edit" value="${name}" onchange="updateActName(${i},this.value)" title="Click to rename"/>
+          <div style="font-size:11px;color:var(--mut);margin-top:2px">${fmtDate(run.start_date_local||run.start_date)}${wk?` · <span style="color:var(--acc)">Wk ${wk.n}</span>`:' · <span style="color:var(--mut)">Pre-block</span>'}</div>
+        </div>
+        <button class="btn btn-sm" onclick="openActEdit(${i})">✎ Edit</button>
+      </div>
+      <div class="act-meta">
+        <span>${dist.toFixed(2)} mi</span>
+        <span>${fmtTime(run.moving_time||0)}</span>
+        <span>${fmtPace(run.average_speed||0)}</span>
+        ${run.total_elevation_gain?`<span>↑ ${Math.round(run.total_elevation_gain*3.281)} ft</span>`:""}
+        ${run.average_heartrate?`<span>♥ ${Math.round(run.average_heartrate)} bpm</span>`:""}
+      </div>
+      <select class="act-shoe-sel" data-i="${i}" onchange="assignShoe(${i},this.value)">${shoeOptions(shoe)}</select>
+      ${run.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:8px;font-style:italic">"${run.description}"</div>`:""}
+      <button class="btn btn-sm" id="anl-${i}" onclick="analyzeRun(${i})">✦ Analyze</button>
+      <div class="fb" id="fb-${i}"></div>`;
+    list.appendChild(c);
+  });
+}
+
+function updateActName(i, newName) {
+  const run = loadedRuns[i];
+  if (!run) return;
+  STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), name:newName};
+  save("actEdits", STATE.actEdits);
+}
+
+function openActEdit(i) {
+  editingActIdx = i;
+  const run = loadedRuns[i];
+  const edit = STATE.actEdits[run.id] || {};
+  document.getElementById("act-name-inp").value  = edit.name  || run.name;
+  document.getElementById("act-notes-inp").value = edit.notes || run.description || "";
+  document.getElementById("act-type-inp").innerHTML  = runTypeOptions(edit.type||"");
+  document.getElementById("act-shoe-inp").innerHTML  = shoeOptions(edit.shoe||"");
+  openModal("modal-act");
+}
+
+function saveActEdit() {
+  if (editingActIdx === null) return;
+  const run = loadedRuns[editingActIdx];
+  const prevShoe = (STATE.actEdits[run.id]||{}).shoe;
+  const newShoe  = document.getElementById("act-shoe-inp").value;
+  const dist     = parseFloat(fmtDist(run.distance||0));
+
+  // update shoe mileage
+  if (prevShoe && prevShoe !== newShoe) {
+    const ps = STATE.shoes.find(s=>s.id===prevShoe);
+    if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles - dist).toFixed(2))); save("shoes", STATE.shoes); }
+  }
+  if (newShoe && newShoe !== prevShoe) addMilesToShoe(newShoe, dist);
+
+  STATE.actEdits[run.id] = {
+    name:  document.getElementById("act-name-inp").value,
+    type:  document.getElementById("act-type-inp").value,
+    shoe:  newShoe,
+    notes: document.getElementById("act-notes-inp").value,
+  };
+  save("actEdits", STATE.actEdits);
+  closeModal("modal-act");
+  renderActivities(loadedRuns);
+  renderShoes();
+  toast("Activity updated");
+}
+
+function assignShoe(i, shoeId) {
+  const run = loadedRuns[i];
+  if (!run) return;
+  const prev = (STATE.actEdits[run.id]||{}).shoe;
+  const dist = parseFloat(fmtDist(run.distance||0));
+  if (prev && prev !== shoeId) {
+    const ps = STATE.shoes.find(s=>s.id===prev);
+    if (ps) { ps.miles = Math.max(0,parseFloat((ps.miles-dist).toFixed(2))); save("shoes",STATE.shoes); }
+  }
+  if (shoeId && shoeId !== prev) addMilesToShoe(shoeId, dist);
+  STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe:shoeId};
+  save("actEdits", STATE.actEdits);
+  renderShoes();
+  toast("Shoe assigned");
+}
+
+async function analyzeRun(i) {
+  const card = document.querySelector(`.act-card[data-i="${i}"]`);
+  const run  = JSON.parse(card.dataset.run);
+  const btn  = document.getElementById("anl-"+i), fb=document.getElementById("fb-"+i);
+  btn.disabled=true; fb.className="fb show load"; fb.textContent="Analyzing…";
+  const wk = (() => { const d=new Date(run.date); for(let j=WEEKS.length-1;j>=0;j--) if(d>=wkStart(WEEKS[j])) return WEEKS[j]; return null; })();
+  const ctx = wk ? `Week ${wk.n} of 22 (${wk.dates}), target ${wk.mpw} mpw. Tue AM: ${wk.w1||"—"}. Tue PM: ${wk.w2||"—"}. Fri: ${wk.w3||"—"}. MP: ${wk.mp||"—"}.` : "Pre-block base building.";
+  const prompt=`You are a running coach for Michael Malin — advanced runner in St. Louis targeting ${STATE.goal} Philadelphia Marathon (${calcPace(STATE.goal)}) on ${STATE.raceDate}. PR: 2:57:03 (Mesa, Feb 2026).
+
+Run: "${run.name}" on ${fmtDate(run.date)}
+Distance: ${fmtDist(run.dist)} mi | Pace: ${fmtPace(run.spd)} | Time: ${fmtTime(run.mv)}${run.elev?` | Elev: ${Math.round(run.elev*3.281)} ft`:""}${run.hr?` | HR: ${Math.round(run.hr)} bpm`:""}
+${run.desc?`Note: "${run.desc}"`:""}
+
+Context: ${ctx}
+
+Give 3–5 sentences of direct coaching feedback: fit to week goals, pacing vs marathon target, any flags, one actionable tip.`;
+  try {
+    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const text=data.content?.find(b=>b.type==="text")?.text||"No feedback.";
+    fb.className="fb show"; fb.textContent=text;
+  } catch(e) { fb.className="fb show"; fb.textContent="Could not generate feedback."; }
+  btn.disabled=false;
+}
+
+async function analyzeAll() {
+  const btn=document.getElementById("analyze-all-btn"); btn.disabled=true; btn.textContent="Analyzing…";
+  for(let i=0;i<loadedRuns.length;i++){analyzeRun(i);await new Promise(r=>setTimeout(r,900));}
+  btn.disabled=false; btn.textContent="✦ Analyze all";
+}
+
+// ═══════════════════════════════════════════════════════════
+// RACE PREDICTIONS
+// ═══════════════════════════════════════════════════════════
+function computePredictions(runs) {
+  if (!runs || !runs.length) return;
+  // Riegel formula: T2 = T1 * (D2/D1)^1.06
+  const recent = runs.slice(0,10).filter(r=>r.distance>4000);
+  if (!recent.length) return;
+  const refRun = recent.reduce((best,r) => (r.distance>best.distance?r:best), recent[0]);
+  const refDist = refRun.distance / 1609.34; // miles
+  const refTime = refRun.moving_time; // secs
+  const dists = [{name:"5K",mi:3.1068},{name:"10K",mi:6.2137},{name:"Half",mi:13.1094},{name:"Marathon",mi:26.2188}];
+  const preds = dists.map(d => {
+    const t = refTime * Math.pow(d.mi/refDist, 1.06);
+    return {name:d.name, time:secsToHMS(t), pace:calcPace(secsToHMS(t), d.mi)};
+  });
+
+  const card = document.getElementById("pred-card");
+  const grid = document.getElementById("pred-grid");
+  grid.innerHTML = preds.map(p=>`
+    <div class="pred-item">
+      <div class="pred-dist">${p.name}</div>
+      <div class="pred-time">${p.time}</div>
+      <div class="pred-pace">${p.pace}</div>
+    </div>`).join("");
+  card.style.display = "";
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS / MODALS / TOAST
+// ═══════════════════════════════════════════════════════════
+function showTab(id, btn) {
+  document.querySelectorAll(".pane").forEach(p=>p.classList.remove("on"));
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
+  document.getElementById("pane-"+id).classList.add("on");
+  btn.classList.add("on");
+  if (id==="shoes") renderShoes();
+  if (id==="chart") renderChart();
+}
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-overlay").forEach(m => m.addEventListener("click", e => { if(e.target===m) m.classList.remove("open"); }));
+let _toastTimer;
+function toast(msg, type="ok") {
+  const el=document.getElementById("toast"); el.textContent=msg; el.className="toast "+type+" show";
+  clearTimeout(_toastTimer); _toastTimer=setTimeout(()=>el.classList.remove("show"),2500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════
+async function boot() {
+  applyTheme(STATE.theme);
+  updateGoalDisplay();
+  await loadFromSheet();
+  buildWeekStrip();
+  selectedWeekIdx = curWeekIdx();
+  document.querySelectorAll(".wchip").forEach((x,j)=>x.classList.toggle("on",j===selectedWeekIdx));
+  renderBlock();
+  renderShoes();
+}
+
+boot();
+</script>
+</body>
+</html>
