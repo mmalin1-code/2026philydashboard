@@ -1202,6 +1202,13 @@ async function loadActivities() {
     const acts = JSON.parse(raw.slice(s,e+1));
     if(!Array.isArray(acts)) throw new Error("Unexpected response.");
     loadedRuns = acts.filter(a=>a.type==="Run"||a.sport_type==="Run");
+    for (const run of loadedRuns) {
+  await syncRunToSheet(run);
+}
+
+if (!loadedRuns.length) {
+  // existing code...
+}
     if(!loadedRuns.length) { setActsStatus("No recent runs found."); return; }
     setActsStatus(loadedRuns.length + " runs loaded.");
     renderActivities(loadedRuns);
