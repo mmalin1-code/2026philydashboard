@@ -1126,6 +1126,34 @@ function addMilesToShoe(shoeId, miles) {
 // ═══════════════════════════════════════════════════════════
 // STRAVA
 // ═══════════════════════════════════════════════════════════
+  async function syncRunToSheet(run) {
+
+  try {
+
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "log",
+        date: run.start_date_local,
+        name: run.name,
+        distMi: (run.distance / 1609.34).toFixed(2),
+        timeSec: run.moving_time,
+        pace: run.average_speed,
+        hrAvg: run.average_heartrate || "",
+        shoe: run.gear?.name || "",
+        notes: run.description || "",
+        stravaId: String(run.id)
+      })
+    });
+
+  } catch(err) {
+    console.error("Sheet Sync Error:", err);
+  }
+
+}
 async function connectStrava() {
   const tok = document.getElementById("tok").value.trim();
   const errEl = document.getElementById("tok-err");
