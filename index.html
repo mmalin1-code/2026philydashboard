@@ -267,7 +267,7 @@ input,select,textarea{font-family:var(--sans)}
 
 <!-- METRICS -->
 <div class="metrics">
-  <div class="met"><div class="met-l">Block miles</div><div class="met-v">727</div><div class="met-s">planned total</div></div>
+  <div class="met"><div class="met-l">Block miles</div><div class="met-v" id="m-blocktotal">—</div><div class="met-s">planned total</div></div>
   <div class="met"><div class="met-l">This week</div><div class="met-v" id="m-mpw">—</div><div class="met-s">mile goal</div></div>
   <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of 22</div></div>
   <div class="met"><div class="met-l">Completed</div><div class="met-v" id="m-done">—</div><div class="met-s">miles logged</div></div>
@@ -976,6 +976,7 @@ function updateMetrics() {
   document.getElementById("m-mpw").textContent = cw.mpw || "—";
   document.getElementById("m-wk").textContent  = cw.n   || "—";
   document.getElementById("m-done").textContent = totalActualMiles();
+  document.getElementById("m-blocktotal").textContent = WEEKS.reduce((s,w)=>s+(w.mpw||0),0).toFixed(0);
   const pct = WEEKS.length ? Math.round((ci / (WEEKS.length-1)) * 100) : 0;
   document.getElementById("m-pct").textContent = pct + "%";
   document.getElementById("pbar").style.width  = pct + "%";
