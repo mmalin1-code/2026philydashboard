@@ -251,7 +251,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="topbar-left">
     <h1>Philly Marathon Dashboard</h1>
     <div class="race-info">
-      <div class="race-date" id="race-date-display">November 22, 2026</div>
+      <div class="race-date" id="race-date-display">November 21, 2026</div>
       <div class="goal-display">
         <div class="goal-time" id="goal-display">2:50:00</div>
         <div class="goal-pace" id="pace-display">6:27/mi</div>
@@ -340,11 +340,11 @@ input,select,textarea{font-family:var(--sans)}
 <!-- ═══ STRAVA ═══ -->
 <div class="pane" id="pane-strava">
   <div class="strava-connect" id="strava-connect-section">
-    <h3>Connect Strava</h3>
-    <p>Paste your Strava access token to load activities. Get one at <a href="https://www.strava.com/settings/api" target="_blank">strava.com/settings/api</a> — needs <code style="font-family:var(--mono);font-size:12px">activity:read_all</code> scope.</p>
+    <h3>Strava activities</h3>
+    <p>This dashboard pulls your activities through the Strava MCP connector in Claude — no token needed. Ask Claude in chat to <strong style="color:var(--txt)">"refresh my Strava activities"</strong> and it will pull your latest runs directly and inject them here.</p>
+    <p style="font-size:12px;color:var(--mut)">First time? Just say <em>"load my recent Strava runs into the dashboard"</em> in the conversation.</p>
     <div class="tok-row">
-      <input class="tok-inp" id="tok" type="password" placeholder="Access token…" onkeydown="if(event.key==='Enter')connectStrava()"/>
-      <button class="btn btn-acc" onclick="connectStrava()">Connect</button>
+      <button class="btn btn-acc" onclick="sendPrompt('Refresh my Strava activities in the dashboard')">Ask Claude to refresh</button>
     </div>
     <div class="stat-line err" id="tok-err"></div>
   </div>
@@ -352,11 +352,10 @@ input,select,textarea{font-family:var(--sans)}
   <div id="strava-connected" class="hide">
     <div class="connected-bar">
       <div class="connected-dot"></div>
-      <span style="font-size:13px;font-weight:500;color:var(--gr)">Connected to Strava</span>
+      <span style="font-size:13px;font-weight:500;color:var(--gr)">Live via Strava MCP</span>
       <div style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="loadActivities()" id="refresh-acts-btn">↻ Refresh</button>
+        <button class="btn btn-sm" onclick="sendPrompt('Refresh my Strava activities in the dashboard')" id="refresh-acts-btn">↻ Ask Claude to refresh</button>
         <button class="btn btn-sm" onclick="analyzeAll()" id="analyze-all-btn">✦ Analyze all</button>
-        <button class="btn btn-sm" onclick="disconnectStrava()" style="color:var(--mut)">Disconnect</button>
       </div>
     </div>
     <div class="stat-line" id="acts-status"></div>
@@ -385,7 +384,7 @@ input,select,textarea{font-family:var(--sans)}
     </div>
     <div class="form-row">
       <label>Race date</label>
-      <input type="date" id="race-date-input" value="2026-11-22"/>
+      <input type="date" id="race-date-input" value="2026-11-21"/>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-goal')">Cancel</button>
@@ -520,7 +519,7 @@ input,select,textarea{font-family:var(--sans)}
 // CONFIG
 // ═══════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
-const RACE_DATE_DEFAULT = "2026-11-22";
+const RACE_DATE_DEFAULT = "2026-11-21";
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -662,7 +661,7 @@ const FALLBACK_WEEKS = [
   {n:19,mon:"2026-10-26",dates:"Oct 26–Nov 1",mpw:75,days:["5","16","10","5","10","9","20"],w1:"2 mi WU · 8×1 mi @ Threshold · 2 mi CD",w2:"",w3:"",mp:"",race:""},
   {n:20,mon:"2026-11-02",dates:"Nov 2–8",mpw:55,days:["5","10","8","7","7","OFF","18"],w1:"2 mi WU · 10×1k @ 10k · 2 mi CD",w2:"2 mi WU · 8×20 sec fast · CD to 7 mi",w3:"",mp:"2 mi WU · 14 mi at goal MP · 2 mi CD",race:""},
   {n:21,mon:"2026-11-09",dates:"Nov 9–15",mpw:42,days:["6","8","6","5","6","OFF","11"],w1:"2 mi WU · 8×800 @ LT · 2 mi CD",w2:"2 mi WU · 4×400 @ mile pace · 2 mi CD",w3:"",mp:"",race:""},
-  {n:22,mon:"2026-11-16",dates:"Nov 16–22",mpw:41,days:["OFF","5","4","3","OFF","3","26.2"],w1:"2 mi WU · 2 mi @ goal MP · 4×400 @ 10k · 1 mi CD",w2:"",w3:"",mp:"",race:"Philadelphia Marathon"},
+  {n:22,mon:"2026-11-16",dates:"Nov 16–21",mpw:41,days:["OFF","5","4","3","OFF","3","26.2"],w1:"2 mi WU · 2 mi @ goal MP · 4×400 @ 10k · 1 mi CD",w2:"",w3:"",mp:"",race:"Philadelphia Marathon"},
 ];
 
 async function loadFromSheet() {
@@ -1124,57 +1123,38 @@ function addMilesToShoe(shoeId, miles) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STRAVA
+// STRAVA — fed via Claude + Strava MCP (no token needed)
 // ═══════════════════════════════════════════════════════════
-  async function syncRunToSheet(run) {
-
-  try {
-
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "log",
-        date: run.start_date_local,
-        name: run.name,
-        distMi: (run.distance / 1609.34).toFixed(2),
-        timeSec: run.moving_time,
-        pace: run.average_speed,
-        hrAvg: run.average_heartrate || "",
-        shoe: run.gear?.name || "",
-        notes: run.description || "",
-        stravaId: String(run.id)
-      })
-    });
-
-  } catch(err) {
-    console.error("Sheet Sync Error:", err);
-  }
-
-}
-async function connectStrava() {
-  const tok = document.getElementById("tok").value.trim();
-  const errEl = document.getElementById("tok-err");
-  if (!tok) { errEl.textContent = "Paste your access token first."; return; }
-  errEl.textContent = "";
-  stravaToken = tok;
-  document.getElementById("strava-connect-section").style.display = "none";
-  document.getElementById("strava-connected").classList.remove("hide");
-  loadActivities();
-}
-function disconnectStrava() {
-  stravaToken = null;
-  document.getElementById("strava-connect-section").style.display = "";
-  document.getElementById("strava-connected").classList.add("hide");
-  document.getElementById("tok").value = "";
-  document.getElementById("acts-list").innerHTML = "";
-  document.getElementById("pred-card").style.display = "none";
-}
 function setActsStatus(msg, err=false) {
   const el = document.getElementById("acts-status");
   el.textContent = msg; el.className = "stat-line" + (err?" err":"");
+}
+
+/**
+ * Called by Claude after fetching activities via the Strava MCP.
+ * Pass an array of Strava activity objects (matching the Strava API
+ * activity summary shape: id, name, sport_type/type, start_date_local,
+ * distance (meters), moving_time (sec), average_speed (m/s),
+ * average_heartrate, total_elevation_gain (m), description).
+ */
+function loadStravaActivities(activities) {
+  if (!Array.isArray(activities) || !activities.length) {
+    setActsStatus("No activities received.", true);
+    return;
+  }
+  document.getElementById("strava-connect-section").style.display = "none";
+  document.getElementById("strava-connected").classList.remove("hide");
+
+  loadedRuns = activities.filter(a => (a.type==="Run" || a.sport_type==="Run"));
+  if (!loadedRuns.length) { setActsStatus("No runs found in the activities provided."); return; }
+
+  setActsStatus(loadedRuns.length + " runs loaded · " + new Date().toLocaleTimeString());
+  renderActivities(loadedRuns);
+  computePredictions(loadedRuns);
+  updateMetrics();
+
+  // Sync each run to the Log sheet in the background (best-effort)
+  loadedRuns.forEach(run => syncRunToSheet(run));
 }
 
 async function syncRunToSheet(run) {
@@ -1191,7 +1171,7 @@ async function syncRunToSheet(run) {
         timeSec:  run.moving_time,
         pace:     fmtPace(run.average_speed),
         hrAvg:    run.average_heartrate || "",
-        shoe:     "",
+        shoe:     (STATE.actEdits[run.id]||{}).shoe || "",
         notes:    run.description || "",
         stravaId: run.id,
       })
@@ -1199,45 +1179,6 @@ async function syncRunToSheet(run) {
   } catch(e) {
     console.warn("Sheet sync failed for run", run.id, e);
   }
-}
-
-async function loadActivities() {
-  const btn = document.getElementById("refresh-acts-btn");
-  btn.disabled = true; btn.textContent = "Loading…";
-  setActsStatus("Fetching from Strava…");
-  document.getElementById("acts-list").innerHTML = "";
-  document.getElementById("pred-card").style.display = "none";
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        model:"claude-sonnet-4-6", max_tokens:8000,
-        system:"You are a data proxy. Fetch the given URL with the given Authorization header and return ONLY the raw JSON response body — no markdown, no prose.",
-        tools:[{type:"web_search_20250305",name:"web_search"}],
-        messages:[{role:"user",content:`Fetch this URL and return ONLY the raw JSON array:\nGET https://www.strava.com/api/v3/athlete/activities?per_page=20\nAuthorization: Bearer ${stravaToken}`}]
-      })
-    });
-    const data = await res.json();
-    let raw = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-    raw = raw.replace(/^```[a-z]*\n?/i,"").replace(/\n?```$/,"").trim();
-    const s=raw.indexOf("["),e=raw.lastIndexOf("]");
-    if(s===-1||e===-1) throw new Error("Could not parse Strava response — token may be invalid.");
-    const acts = JSON.parse(raw.slice(s,e+1));
-    if(!Array.isArray(acts)) throw new Error("Unexpected response.");
-    loadedRuns = acts.filter(a=>a.type==="Run"||a.sport_type==="Run");
-
-    if(!loadedRuns.length) { setActsStatus("No recent runs found."); btn.disabled=false; btn.textContent="↻ Refresh"; return; }
-
-    setActsStatus(loadedRuns.length + " runs loaded.");
-    renderActivities(loadedRuns);
-    computePredictions(loadedRuns);
-    updateMetrics();
-
-    loadedRuns.forEach(run => syncRunToSheet(run));
-
-  } catch(e) { setActsStatus(e.message, true); }
-  btn.disabled=false; btn.textContent="↻ Refresh";
 }
 
 function shoeOptions(selectedId) {
