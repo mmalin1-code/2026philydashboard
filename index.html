@@ -1177,6 +1177,30 @@ function setActsStatus(msg, err=false) {
   el.textContent = msg; el.className = "stat-line" + (err?" err":"");
 }
 
+async function syncRunToSheet(run) {
+  try {
+    const dist = parseFloat(fmtDist(run.distance || 0));
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action:   "log",
+        date:     run.start_date_local || run.start_date,
+        name:     run.name,
+        distMi:   dist,
+        timeSec:  run.moving_time,
+        pace:     fmtPace(run.average_speed),
+        hrAvg:    run.average_heartrate || "",
+        shoe:     "",
+        notes:    run.description || "",
+        stravaId: run.id,
+      })
+    });
+  } catch(e) {
+    console.warn("Sheet sync failed for run", run.id, e);
+  }
+}
+
 async function loadActivities() {
   const btn = document.getElementById("refresh-acts-btn");
   btn.disabled = true; btn.textContent = "Loading…";
@@ -1202,18 +1226,16 @@ async function loadActivities() {
     const acts = JSON.parse(raw.slice(s,e+1));
     if(!Array.isArray(acts)) throw new Error("Unexpected response.");
     loadedRuns = acts.filter(a=>a.type==="Run"||a.sport_type==="Run");
-    for (const run of loadedRuns) {
-  await syncRunToSheet(run);
-}
 
-if (!loadedRuns.length) {
-  // existing code...
-}
-    if(!loadedRuns.length) { setActsStatus("No recent runs found."); return; }
+    if(!loadedRuns.length) { setActsStatus("No recent runs found."); btn.disabled=false; btn.textContent="↻ Refresh"; return; }
+
     setActsStatus(loadedRuns.length + " runs loaded.");
     renderActivities(loadedRuns);
     computePredictions(loadedRuns);
     updateMetrics();
+
+    loadedRuns.forEach(run => syncRunToSheet(run));
+
   } catch(e) { setActsStatus(e.message, true); }
   btn.disabled=false; btn.textContent="↻ Refresh";
 }
