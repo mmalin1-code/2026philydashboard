@@ -120,6 +120,7 @@ input,select,textarea{font-family:var(--sans)}
 .dc-day{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin-bottom:4px;margin-top:2px}
 .dc-planned{font-size:13px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1}
 .dc-actual{font-size:11px;font-family:var(--mono);color:var(--gr);margin-top:2px;font-weight:600}
+.dc.has-actual{box-shadow:inset 0 0 0 1.5px var(--gr)}
 .dc-type{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
 .dc-shoe{font-size:8px;color:var(--mut);margin-top:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-edit{position:absolute;top:3px;right:3px;font-size:9px;opacity:0;background:var(--sur);border:1px solid var(--bdr);border-radius:4px;padding:1px 4px;color:var(--mut);transition:opacity .12s}
@@ -798,20 +799,21 @@ function renderBlock() {
       const ov = getOverride(w.n, di);
       const rt = getRunType(ov.type || guessRunType(w, di));
       const planned = mi === "OFF" ? "—" : (mi+"").replace("ø","");
-      const actual = ov.actualMiles ? ov.actualMiles + " mi" : "";
+      const hasActual = ov.actualMiles !== undefined && ov.actualMiles !== null && ov.actualMiles !== "";
+      const displayMiles = hasActual ? parseFloat(ov.actualMiles).toFixed(1) : planned;
       const shoe = ov.shoe ? (getShoe(ov.shoe)||{name:""}).name : "";
 
       const cell = document.createElement("div");
-      cell.className = "dc" + (mi==="OFF" ? " rest" : "");
+      cell.className = "dc" + (mi==="OFF" && !hasActual ? " rest" : "") + (hasActual ? " has-actual" : "");
       if (rt) cell.style.borderColor = rt.color + "88";
-      if (rt && mi !== "OFF") cell.style.background = rt.color + "18";
+      if (rt && (mi !== "OFF" || hasActual)) cell.style.background = rt.color + "18";
       cell.dataset.wn = w.n; cell.dataset.di = di;
       cell.innerHTML = `
         <button class="dc-edit" onclick="openDayEdit(${w.n},${di},event)">✎</button>
         <div class="dc-day">${DN[di]}</div>
-        <div class="dc-planned">${planned}</div>
-        ${actual ? `<div class="dc-actual">${actual}</div>` : ""}
-        ${rt && mi!=="OFF" ? `<div class="dc-type" style="color:${rt.color}">${rt.name}</div>` : ""}
+        <div class="dc-planned" style="${hasActual?'color:var(--gr)':''}">${displayMiles}</div>
+        ${hasActual ? `<div class="dc-actual">actual${ov.fromStrava?' · synced':''}</div>` : ""}
+        ${rt && (mi!=="OFF"||hasActual) ? `<div class="dc-type" style="color:${rt.color}">${rt.name}</div>` : ""}
         ${shoe ? `<div class="dc-shoe">${shoe}</div>` : ""}`;
       cell.onclick = (e) => { if (!e.target.classList.contains("dc-edit")) openDayEdit(w.n, di, e); };
       grid.appendChild(cell);
@@ -1246,12 +1248,61 @@ async function loadActivities() {
     setActsStatus(loadedRuns.length + " runs loaded · " + new Date().toLocaleTimeString());
     renderActivities(loadedRuns);
     computePredictions(loadedRuns);
+    mapRunsToCalendar(loadedRuns);
     updateMetrics();
     loadedRuns.forEach(run => syncRunToSheet(run));
   } catch(e) {
     setActsStatus(e.message, true);
   }
   if (btn) { btn.disabled = false; btn.textContent = "↻ Refresh"; }
+}
+
+/**
+ * Auto-maps Strava runs onto the training calendar by matching dates.
+ * Multiple runs on the same calendar day are summed together (handles
+ * double-workout days). Writes into STATE.dayOverrides so the day cell
+ * shows actual miles in place of the planned number.
+ */
+function mapRunsToCalendar(runs) {
+  // group runs by local calendar date (YYYY-MM-DD)
+  const byDate = {};
+  runs.forEach(r => {
+    const dt = new Date(r.start_date_local || r.start_date);
+    const key = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
+    if (!byDate[key]) byDate[key] = [];
+    byDate[key].push(r);
+  });
+
+  let changed = false;
+
+  WEEKS.forEach(w => {
+    const monD = wkStart(w);
+    for (let di = 0; di < 7; di++) {
+      const dayD = new Date(monD);
+      dayD.setDate(dayD.getDate() + di);
+      const key = dayD.getFullYear() + "-" + String(dayD.getMonth()+1).padStart(2,"0") + "-" + String(dayD.getDate()).padStart(2,"0");
+      const dayRuns = byDate[key];
+      if (!dayRuns || !dayRuns.length) continue;
+
+      const totalMiles = dayRuns.reduce((s,r) => s + parseFloat(fmtDist(r.distance||0)), 0);
+      const dayKey = getDayKey(w.n, di);
+      const existing = STATE.dayOverrides[dayKey] || {};
+
+      // don't clobber a manually-set type/notes, just update the synced mileage
+      STATE.dayOverrides[dayKey] = {
+        ...existing,
+        actualMiles: parseFloat(totalMiles.toFixed(2)),
+        fromStrava: true,
+        notes: existing.notes || dayRuns.map(r=>r.name).join(" + "),
+      };
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    save("dayOverrides", STATE.dayOverrides);
+    renderBlock();
+  }
 }
 
 async function syncRunToSheet(run) {
