@@ -601,13 +601,11 @@ function curWeekIdx() { const t=new Date(); for(let i=WEEKS.length-1;i>=0;i--) {
 function getDayKey(wn, di) { return `w${wn}-d${di}`; }
 function getOverride(wn, di) { return STATE.dayOverrides[getDayKey(wn,di)] || {}; }
 function totalActualMiles() {
+  // dayOverrides is now the single source of truth — mapRunsToCalendar()
+  // writes synced Strava miles in here, so we must not also re-sum loadedRuns
+  // directly or every synced run gets counted twice.
   let t=0;
   Object.values(STATE.dayOverrides).forEach(o=>{ if(o.actualMiles) t+=parseFloat(o.actualMiles)||0; });
-  const blockStart = new Date("2026-06-22T00:00:00");
-  loadedRuns.forEach(r=>{
-    const d = new Date(r.start_date_local || r.start_date);
-    if (d >= blockStart) t += parseFloat(fmtDist(r.distance||0))||0;
-  });
   return t.toFixed(1);
 }
 
