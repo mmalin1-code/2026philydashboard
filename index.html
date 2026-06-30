@@ -357,7 +357,6 @@ input,select,textarea{font-family:var(--sans)}
       <span style="font-size:13px;font-weight:500;color:var(--gr)" id="connected-label">Connected to Strava</span>
       <div style="margin-left:auto;display:flex;gap:8px">
         <button class="btn btn-sm" onclick="loadActivities()" id="refresh-acts-btn">↻ Refresh</button>
-        <button class="btn btn-sm" onclick="analyzeAll()" id="analyze-all-btn">✦ Analyze all</button>
         <button class="btn btn-sm" onclick="disconnectStrava()" style="color:var(--mut)">Disconnect</button>
       </div>
     </div>
@@ -1315,9 +1314,7 @@ function renderActivities(runs) {
         ${run.average_heartrate?`<span>♥ ${Math.round(run.average_heartrate)} bpm</span>`:""}
       </div>
       <select class="act-shoe-sel" data-i="${i}" onchange="assignShoe(${i},this.value)">${shoeOptions(shoe)}</select>
-      ${run.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:8px;font-style:italic">"${run.description}"</div>`:""}
-      <button class="btn btn-sm" id="anl-${i}" onclick="analyzeRun(${i})">✦ Analyze</button>
-      <div class="fb" id="fb-${i}"></div>`;
+      ${run.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:8px;font-style:italic">"${run.description}"</div>`:""}`;
     list.appendChild(c);
   });
 }
@@ -1381,37 +1378,6 @@ function assignShoe(i, shoeId) {
   save("actEdits", STATE.actEdits);
   renderShoes();
   toast("Shoe assigned");
-}
-
-async function analyzeRun(i) {
-  const card = document.querySelector(`.act-card[data-i="${i}"]`);
-  const run  = JSON.parse(card.dataset.run);
-  const btn  = document.getElementById("anl-"+i), fb=document.getElementById("fb-"+i);
-  btn.disabled=true; fb.className="fb show load"; fb.textContent="Analyzing…";
-  const wk = (() => { const d=new Date(run.date); for(let j=WEEKS.length-1;j>=0;j--) if(d>=wkStart(WEEKS[j])) return WEEKS[j]; return null; })();
-  const ctx = wk ? `Week ${wk.n} of 22 (${wk.dates}), target ${wk.mpw} mpw. Tue AM: ${wk.w1||"—"}. Tue PM: ${wk.w2||"—"}. Fri: ${wk.w3||"—"}. MP: ${wk.mp||"—"}.` : "Pre-block base building.";
-  const prompt=`You are a running coach for Michael Malin — advanced runner in St. Louis targeting ${STATE.goal} Philadelphia Marathon (${calcPace(STATE.goal)}) on ${STATE.raceDate}. PR: 2:57:03 (Mesa, Feb 2026).
-
-Run: "${run.name}" on ${fmtDate(run.date)}
-Distance: ${fmtDist(run.dist)} mi | Pace: ${fmtPace(run.spd)} | Time: ${fmtTime(run.mv)}${run.elev?` | Elev: ${Math.round(run.elev*3.281)} ft`:""}${run.hr?` | HR: ${Math.round(run.hr)} bpm`:""}
-${run.desc?`Note: "${run.desc}"`:""}
-
-Context: ${ctx}
-
-Give 3–5 sentences of direct coaching feedback: fit to week goals, pacing vs marathon target, any flags, one actionable tip.`;
-  try {
-    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    const text=data.content?.find(b=>b.type==="text")?.text||"No feedback.";
-    fb.className="fb show"; fb.textContent=text;
-  } catch(e) { fb.className="fb show"; fb.textContent="Could not generate feedback."; }
-  btn.disabled=false;
-}
-
-async function analyzeAll() {
-  const btn=document.getElementById("analyze-all-btn"); btn.disabled=true; btn.textContent="Analyzing…";
-  for(let i=0;i<loadedRuns.length;i++){analyzeRun(i);await new Promise(r=>setTimeout(r,900));}
-  btn.disabled=false; btn.textContent="✦ Analyze all";
 }
 
 // ═══════════════════════════════════════════════════════════
