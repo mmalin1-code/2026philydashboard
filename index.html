@@ -272,7 +272,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="met"><div class="met-l">This week</div><div class="met-v" id="m-mpw">—</div><div class="met-s">mile goal</div></div>
   <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of 22</div></div>
   <div class="met"><div class="met-l">Completed</div><div class="met-v" id="m-done">—</div><div class="met-s">miles logged</div></div>
-  <div class="met"><div class="met-l">Progress</div><div class="met-v" id="m-pct">—</div><div class="met-s"><div class="prog"><div class="prog-f" id="pbar" style="width:0%"></div></div></div></div>
+  <div class="met"><div class="met-l">Miles to go</div><div class="met-v" id="m-pct">—</div><div class="met-s" id="m-pct-sub"><div class="prog"><div class="prog-f" id="pbar" style="width:0%"></div></div></div></div>
 </div>
 
 <!-- TABS -->
@@ -975,11 +975,14 @@ function updateMetrics() {
   const cw = WEEKS[ci] || WEEKS[0] || {};
   document.getElementById("m-mpw").textContent = cw.mpw || "—";
   document.getElementById("m-wk").textContent  = cw.n   || "—";
-  document.getElementById("m-done").textContent = totalActualMiles();
-  document.getElementById("m-blocktotal").textContent = WEEKS.reduce((s,w)=>s+(w.mpw||0),0).toFixed(0);
-  const pct = WEEKS.length ? Math.round((ci / (WEEKS.length-1)) * 100) : 0;
-  document.getElementById("m-pct").textContent = pct + "%";
-  document.getElementById("pbar").style.width  = pct + "%";
+  const done = parseFloat(totalActualMiles());
+  document.getElementById("m-done").textContent = done.toFixed(1);
+  const blockTotal = WEEKS.reduce((s,w)=>s+(w.mpw||0),0);
+  document.getElementById("m-blocktotal").textContent = blockTotal.toFixed(0);
+  const remaining = Math.max(0, blockTotal - done);
+  document.getElementById("m-pct").textContent = remaining.toFixed(1);
+  const pctDone = blockTotal ? Math.min(100, Math.round((done / blockTotal) * 100)) : 0;
+  document.getElementById("m-pct-sub").innerHTML = `${pctDone}% of plan done<div class="prog"><div class="prog-f" id="pbar" style="width:${pctDone}%"></div></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════
