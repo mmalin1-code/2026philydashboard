@@ -603,7 +603,11 @@ function getOverride(wn, di) { return STATE.dayOverrides[getDayKey(wn,di)] || {}
 function totalActualMiles() {
   let t=0;
   Object.values(STATE.dayOverrides).forEach(o=>{ if(o.actualMiles) t+=parseFloat(o.actualMiles)||0; });
-  loadedRuns.forEach(r=>{ t+=parseFloat(fmtDist(r.distance||0))||0; });
+  const blockStart = new Date("2026-06-22T00:00:00");
+  loadedRuns.forEach(r=>{
+    const d = new Date(r.start_date_local || r.start_date);
+    if (d >= blockStart) t += parseFloat(fmtDist(r.distance||0))||0;
+  });
   return t.toFixed(1);
 }
 
