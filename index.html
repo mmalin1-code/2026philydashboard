@@ -1386,9 +1386,16 @@ function assignShoe(i, shoeId) {
 function computePredictions(runs) {
   if (!runs || !runs.length) return;
   // Riegel formula: T2 = T1 * (D2/D1)^1.06
-  const recent = runs.slice(0,10).filter(r=>r.distance>4000);
+  // Pick the run with the BEST (fastest) pace among reasonably substantial runs —
+  // a fast effort is a much more reliable predictor than just the longest run,
+  // since long runs include warmup/cooldown miles that skew pace slow.
+  const recent = runs.slice(0,15).filter(r => r.distance > 1500 && r.moving_time > 300);
   if (!recent.length) return;
-  const refRun = recent.reduce((best,r) => (r.distance>best.distance?r:best), recent[0]);
+  const refRun = recent.reduce((best,r) => {
+    const paceR = r.moving_time / r.distance;
+    const paceB = best.moving_time / best.distance;
+    return paceR < paceB ? r : best;
+  }, recent[0]);
   const refDist = refRun.distance / 1609.34; // miles
   const refTime = refRun.moving_time; // secs
   const dists = [{name:"5K",mi:3.1068},{name:"10K",mi:6.2137},{name:"Half",mi:13.1094},{name:"Marathon",mi:26.2188}];
@@ -1404,7 +1411,7 @@ function computePredictions(runs) {
       <div class="pred-dist">${p.name}</div>
       <div class="pred-time">${p.time}</div>
       <div class="pred-pace">${p.pace}</div>
-    </div>`).join("");
+    </div>`).join("") + `<div style="grid-column:1/-1;font-size:11px;color:var(--mut);margin-top:6px">Based on: ${refRun.name} (${(refRun.distance/1609.34).toFixed(2)} mi @ ${fmtPace(refRun.distance/refRun.moving_time)})</div>`;
   card.style.display = "";
 }
 
