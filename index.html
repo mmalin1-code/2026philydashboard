@@ -340,11 +340,13 @@ input,select,textarea{font-family:var(--sans)}
 <!-- ═══ STRAVA ═══ -->
 <div class="pane" id="pane-strava">
   <div class="strava-connect" id="strava-connect-section">
-    <h3>Strava activities</h3>
-    <p>This dashboard pulls your activities through the Strava MCP connector in Claude — no token needed. Ask Claude in chat to <strong style="color:var(--txt)">"refresh my Strava activities"</strong> and it will pull your latest runs directly and inject them here.</p>
-    <p style="font-size:12px;color:var(--mut)">First time? Just say <em>"load my recent Strava runs into the dashboard"</em> in the conversation.</p>
+    <h3>Connect Strava</h3>
+    <p>Connect your Strava account once — the dashboard handles token refresh automatically from then on.</p>
     <div class="tok-row">
-      <button class="btn btn-acc" onclick="sendPrompt('Refresh my Strava activities in the dashboard')">Ask Claude to refresh</button>
+      <button class="btn btn-acc" onclick="startStravaOAuth()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-3px;margin-right:6px"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.172"/></svg>
+        Connect with Strava
+      </button>
     </div>
     <div class="stat-line err" id="tok-err"></div>
   </div>
@@ -352,10 +354,11 @@ input,select,textarea{font-family:var(--sans)}
   <div id="strava-connected" class="hide">
     <div class="connected-bar">
       <div class="connected-dot"></div>
-      <span style="font-size:13px;font-weight:500;color:var(--gr)">Live via Strava MCP</span>
+      <span style="font-size:13px;font-weight:500;color:var(--gr)" id="connected-label">Connected to Strava</span>
       <div style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="sendPrompt('Refresh my Strava activities in the dashboard')" id="refresh-acts-btn">↻ Ask Claude to refresh</button>
+        <button class="btn btn-sm" onclick="loadActivities()" id="refresh-acts-btn">↻ Refresh</button>
         <button class="btn btn-sm" onclick="analyzeAll()" id="analyze-all-btn">✦ Analyze all</button>
+        <button class="btn btn-sm" onclick="disconnectStrava()" style="color:var(--mut)">Disconnect</button>
       </div>
     </div>
     <div class="stat-line" id="acts-status"></div>
@@ -369,6 +372,7 @@ input,select,textarea{font-family:var(--sans)}
     <div id="acts-list"></div>
   </div>
 </div>
+
 
 </div><!-- end .app -->
 
@@ -1123,38 +1127,127 @@ function addMilesToShoe(shoeId, miles) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STRAVA — fed via Claude + Strava MCP (no token needed)
+// STRAVA OAUTH
 // ═══════════════════════════════════════════════════════════
+const STRAVA_CLIENT_ID = "206902";
+// Client secret lives in Apps Script (server-side), NOT here.
+// Apps Script exposes ?action=stravaToken to do the exchange/refresh.
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
 function setActsStatus(msg, err=false) {
   const el = document.getElementById("acts-status");
   el.textContent = msg; el.className = "stat-line" + (err?" err":"");
 }
 
-/**
- * Called by Claude after fetching activities via the Strava MCP.
- * Pass an array of Strava activity objects (matching the Strava API
- * activity summary shape: id, name, sport_type/type, start_date_local,
- * distance (meters), moving_time (sec), average_speed (m/s),
- * average_heartrate, total_elevation_gain (m), description).
- */
-function loadStravaActivities(activities) {
-  if (!Array.isArray(activities) || !activities.length) {
-    setActsStatus("No activities received.", true);
-    return;
+function startStravaOAuth() {
+  const url = "https://www.strava.com/oauth/authorize"
+    + "?client_id=" + STRAVA_CLIENT_ID
+    + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI)
+    + "&response_type=code"
+    + "&approval_prompt=auto"
+    + "&scope=activity:read_all";
+  window.location.href = url;
+}
+
+function disconnectStrava() {
+  save("stravaTokens", null);
+  document.getElementById("strava-connect-section").style.display = "";
+  document.getElementById("strava-connected").classList.add("hide");
+  document.getElementById("acts-list").innerHTML = "";
+  document.getElementById("pred-card").style.display = "none";
+  loadedRuns = [];
+}
+
+// Handle the redirect back from Strava with ?code=...
+async function handleStravaRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (!code) return false;
+
+  setActsStatus("Connecting to Strava…");
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?action=stravaExchange&code=" + encodeURIComponent(code));
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.access_token) throw new Error("No access token returned.");
+
+    save("stravaTokens", {
+      access_token:  data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at:    data.expires_at,
+      athlete:       data.athlete || null,
+    });
+
+    // clean the ?code= param out of the URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return true;
+  } catch(e) {
+    setActsStatus("Strava connection failed: " + e.message, true);
+    return false;
   }
-  document.getElementById("strava-connect-section").style.display = "none";
-  document.getElementById("strava-connected").classList.remove("hide");
+}
 
-  loadedRuns = activities.filter(a => (a.type==="Run" || a.sport_type==="Run"));
-  if (!loadedRuns.length) { setActsStatus("No runs found in the activities provided."); return; }
+async function getValidStravaToken() {
+  let tokens = lsJ("stravaTokens");
+  if (!tokens) return null;
 
-  setActsStatus(loadedRuns.length + " runs loaded · " + new Date().toLocaleTimeString());
-  renderActivities(loadedRuns);
-  computePredictions(loadedRuns);
-  updateMetrics();
+  const now = Math.floor(Date.now() / 1000);
+  if (tokens.expires_at && tokens.expires_at > now + 60) {
+    return tokens.access_token; // still valid
+  }
 
-  // Sync each run to the Log sheet in the background (best-effort)
-  loadedRuns.forEach(run => syncRunToSheet(run));
+  // expired — refresh via Apps Script (keeps client secret server-side)
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?action=stravaRefresh&refresh_token=" + encodeURIComponent(tokens.refresh_token));
+    const data = await res.json();
+    if (data.error || !data.access_token) throw new Error(data.error || "Refresh failed");
+
+    tokens = {
+      access_token:  data.access_token,
+      refresh_token: data.refresh_token || tokens.refresh_token,
+      expires_at:    data.expires_at,
+      athlete:       tokens.athlete,
+    };
+    save("stravaTokens", tokens);
+    return tokens.access_token;
+  } catch(e) {
+    console.warn("Token refresh failed", e);
+    return null;
+  }
+}
+
+async function loadActivities() {
+  const btn = document.getElementById("refresh-acts-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+  setActsStatus("Fetching from Strava…");
+  document.getElementById("acts-list").innerHTML = "";
+  document.getElementById("pred-card").style.display = "none";
+
+  try {
+    const token = await getValidStravaToken();
+    if (!token) throw new Error("Not connected — click Connect with Strava.");
+
+    const res = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=20", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    if (!res.ok) {
+      if (res.status === 401) { disconnectStrava(); throw new Error("Session expired — please reconnect."); }
+      throw new Error("Strava API error: " + res.status);
+    }
+    const acts = await res.json();
+    loadedRuns = acts.filter(a => a.type === "Run" || a.sport_type === "Run");
+
+    if (!loadedRuns.length) { setActsStatus("No recent runs found."); if(btn){btn.disabled=false;btn.textContent="↻ Refresh";} return; }
+
+    setActsStatus(loadedRuns.length + " runs loaded · " + new Date().toLocaleTimeString());
+    renderActivities(loadedRuns);
+    computePredictions(loadedRuns);
+    updateMetrics();
+    loadedRuns.forEach(run => syncRunToSheet(run));
+  } catch(e) {
+    setActsStatus(e.message, true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "↻ Refresh"; }
 }
 
 async function syncRunToSheet(run) {
@@ -1377,6 +1470,18 @@ async function boot() {
   document.querySelectorAll(".wchip").forEach((x,j)=>x.classList.toggle("on",j===selectedWeekIdx));
   renderBlock();
   renderShoes();
+
+  // Strava OAuth: handle redirect-back, or restore existing session
+  const justConnected = await handleStravaRedirect();
+  const tokens = lsJ("stravaTokens");
+  if (justConnected || tokens) {
+    document.getElementById("strava-connect-section").style.display = "none";
+    document.getElementById("strava-connected").classList.remove("hide");
+    if (tokens && tokens.athlete && tokens.athlete.firstname) {
+      document.getElementById("connected-label").textContent = "Connected as " + tokens.athlete.firstname;
+    }
+    loadActivities();
+  }
 }
 
 boot();
