@@ -606,7 +606,7 @@ function totalActualMiles() {
   // directly or every synced run gets counted twice.
   let t=0;
   Object.values(STATE.dayOverrides).forEach(o=>{ if(o.actualMiles) t+=parseFloat(o.actualMiles)||0; });
-  return t.toFixed(1);
+  return t.toFixed(2);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -774,7 +774,7 @@ function renderBlock() {
       const ov = getOverride(w.n, di);
       if (ov.actualMiles) actualTotal += parseFloat(ov.actualMiles)||0;
     });
-    const actualStr = actualTotal > 0 ? `<span class="wk-mpw-actual">${actualTotal.toFixed(1)} actual</span>` : "";
+    const actualStr = actualTotal > 0 ? `<span class="wk-mpw-actual">${actualTotal.toFixed(2)} actual</span>` : "";
 
     card.innerHTML = `
       <div class="wk-hdr">
@@ -798,7 +798,7 @@ function renderBlock() {
       const rt = getRunType(ov.type || guessRunType(w, di));
       const planned = mi === "OFF" ? "—" : (mi+"").replace("ø","");
       const hasActual = ov.actualMiles !== undefined && ov.actualMiles !== null && ov.actualMiles !== "";
-      const displayMiles = hasActual ? parseFloat(ov.actualMiles).toFixed(1) : planned;
+      const displayMiles = hasActual ? parseFloat(ov.actualMiles).toFixed(2) : planned;
       const shoe = ov.shoe ? (getShoe(ov.shoe)||{name:""}).name : "";
 
       const cell = document.createElement("div");
@@ -976,11 +976,11 @@ function updateMetrics() {
   document.getElementById("m-mpw").textContent = cw.mpw || "—";
   document.getElementById("m-wk").textContent  = cw.n   || "—";
   const done = parseFloat(totalActualMiles());
-  document.getElementById("m-done").textContent = done.toFixed(1);
+  document.getElementById("m-done").textContent = done.toFixed(2);
   const blockTotal = WEEKS.reduce((s,w)=>s+(w.mpw||0),0);
   document.getElementById("m-blocktotal").textContent = blockTotal.toFixed(0);
   const remaining = Math.max(0, blockTotal - done);
-  document.getElementById("m-pct").textContent = remaining.toFixed(1);
+  document.getElementById("m-pct").textContent = remaining.toFixed(2);
   const pctDone = blockTotal ? Math.min(100, Math.round((done / blockTotal) * 100)) : 0;
   document.getElementById("m-pct-sub").innerHTML = `${pctDone}% of plan done<div class="prog"><div class="prog-f" id="pbar" style="width:${pctDone}%"></div></div>`;
 }
