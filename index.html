@@ -249,6 +249,13 @@ input,select,textarea{font-family:var(--sans)}
 .sidebar.collapsed .block-info{display:none}
 .block-name{font-size:13px;font-weight:500;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .block-item.active .block-name{color:var(--acc)}
+.block-name-inp{background:none;border:none;border-bottom:1px solid transparent;font-size:13px;font-weight:500;color:var(--txt);font-family:var(--sans);padding:0 2px;width:100%;min-width:0;cursor:text;transition:border-color .12s}
+.block-item.active .block-name-inp{color:var(--acc)}
+.block-name-inp:hover{border-bottom-color:var(--bdr)}
+.block-name-inp:focus{outline:none;border-bottom-color:var(--acc)}
+.block-del-btn{background:none;border:none;color:var(--mut);font-size:11px;padding:0 2px;cursor:pointer;flex-shrink:0;opacity:0;transition:opacity .12s}
+.block-item:hover .block-del-btn{opacity:1}
+.block-del-btn:hover{color:var(--rd)}
 .block-meta{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-add{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--mut);font-size:13px;margin-top:4px;border-left:3px solid transparent;transition:all .12s}
 .sidebar-add:hover{color:var(--acc);background:var(--sur2)}
@@ -292,7 +299,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="topbar-left">
     <h1>Philly Marathon Dashboard</h1>
     <div class="race-info">
-      <div class="race-date" id="race-date-display">November 21, 2026</div>
+      <div class="race-date" id="race-date-display">November 22, 2026</div>
       <div class="goal-display">
         <div class="goal-time" id="goal-display">2:50:00</div>
         <div class="goal-pace" id="pace-display">6:27/mi</div>
@@ -428,7 +435,7 @@ input,select,textarea{font-family:var(--sans)}
     </div>
     <div class="form-row">
       <label>Race date</label>
-      <input type="date" id="race-date-input" value="2026-11-21"/>
+      <input type="date" id="race-date-input" value="2026-11-22"/>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-goal')">Cancel</button>
@@ -563,7 +570,7 @@ input,select,textarea{font-family:var(--sans)}
 // CONFIG
 // ═══════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
-const RACE_DATE_DEFAULT = "2026-11-21";
+const RACE_DATE_DEFAULT = "2026-11-22";
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -1576,7 +1583,8 @@ const PHILLY_BLOCK = {
   id: "philly2026",
   name: "Philly 2026",
   raceName: "Philadelphia Marathon",
-  raceDate: "2026-11-21",
+  startDate: "2026-06-22",
+  raceDate: "2026-11-22",
   goal: "2:50:00",
   color: "#FF6B35",
   scriptUrl: APPS_SCRIPT_URL,
@@ -1590,18 +1598,53 @@ function saveBlocks() { save("pm_blocks", BLOCKS); }
 function renderSidebar() {
   const list = document.getElementById("block-list");
   list.innerHTML = "";
-  BLOCKS.forEach(b => {
+
+  // Active block always first, rest sorted by race date descending
+  const active = BLOCKS.filter(b => b.id === activeBlockId);
+  const rest   = BLOCKS.filter(b => b.id !== activeBlockId)
+                       .sort((a,b) => new Date(b.raceDate) - new Date(a.raceDate));
+  const sorted = [...active, ...rest];
+
+  sorted.forEach(b => {
+    const isActive = b.id === activeBlockId;
     const item = document.createElement("div");
-    item.className = "block-item" + (b.id === activeBlockId ? " active" : "");
+    item.className = "block-item" + (isActive ? " active" : "");
+
+    const startLabel = b.startDate
+      ? new Date(b.startDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})
+      : "—";
+    const endLabel = new Date(b.raceDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+
     item.innerHTML = `
-      <div class="block-dot" style="background:${b.color}"></div>
-      <div class="block-info">
-        <div class="block-name">${b.name}</div>
-        <div class="block-meta">${b.goal} · ${new Date(b.raceDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>
+      <div class="block-dot" style="background:${b.color};flex-shrink:0"></div>
+      <div class="block-info" style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="block-name-inp" data-id="${b.id}" value="${b.name}"
+            onclick="event.stopPropagation()"
+            onchange="renameBlock('${b.id}',this.value)"
+            title="Click to rename"/>
+          <button class="block-del-btn" onclick="deleteBlock('${b.id}',event)" title="Remove block">✕</button>
+        </div>
+        <div class="block-meta">${b.goal} · ${startLabel}–${endLabel}</div>
       </div>`;
     item.onclick = () => switchBlock(b.id);
     list.appendChild(item);
   });
+}
+
+function renameBlock(id, newName) {
+  const b = BLOCKS.find(x => x.id === id);
+  if (b && newName.trim()) { b.name = newName.trim(); saveBlocks(); }
+}
+
+function deleteBlock(id, e) {
+  e.stopPropagation();
+  if (BLOCKS.length <= 1) { toast("Can't delete the only block","err"); return; }
+  if (!confirm("Remove this block?")) return;
+  BLOCKS = BLOCKS.filter(b => b.id !== id);
+  saveBlocks();
+  if (activeBlockId === id) switchBlock(BLOCKS[0].id);
+  else renderSidebar();
 }
 
 async function switchBlock(id) {
@@ -1664,15 +1707,16 @@ function openNewBlockModal() {
 }
 
 function saveNewBlock() {
-  const name     = document.getElementById("nb-name").value.trim();
-  const raceName = document.getElementById("nb-racename").value.trim();
-  const raceDate = document.getElementById("nb-date").value;
-  const goal     = document.getElementById("nb-goal").value.trim() || "3:00:00";
-  const scriptUrl= document.getElementById("nb-script").value.trim();
-  const color    = document.getElementById("nb-color").value;
+  const name      = document.getElementById("nb-name").value.trim();
+  const raceName  = document.getElementById("nb-racename").value.trim();
+  const startDate = document.getElementById("nb-start").value;
+  const raceDate  = document.getElementById("nb-date").value;
+  const goal      = document.getElementById("nb-goal").value.trim() || "3:00:00";
+  const scriptUrl = document.getElementById("nb-script").value.trim();
+  const color     = document.getElementById("nb-color").value;
   if (!name || !raceDate) { toast("Name and race date are required","err"); return; }
   const id = "block_" + Date.now();
-  BLOCKS.push({ id, name, raceName, raceDate, goal, color, scriptUrl: scriptUrl || APPS_SCRIPT_URL });
+  BLOCKS.push({ id, name, raceName, startDate, raceDate, goal, color, scriptUrl: scriptUrl || APPS_SCRIPT_URL });
   saveBlocks();
   closeModal("modal-new-block");
   renderSidebar();
@@ -1688,6 +1732,7 @@ renderSidebar();
     <h3>New training block</h3>
     <div class="form-row"><label>Block name</label><input type="text" id="nb-name" placeholder="e.g. Boston 2027"/></div>
     <div class="form-row"><label>Race name</label><input type="text" id="nb-racename" placeholder="e.g. Boston Marathon"/></div>
+    <div class="form-row"><label>Block start date</label><input type="date" id="nb-start"/></div>
     <div class="form-row"><label>Race date</label><input type="date" id="nb-date"/></div>
     <div class="form-row"><label>Goal time</label><input type="text" id="nb-goal" placeholder="e.g. 2:45:00"/></div>
     <div class="form-row"><label>Apps Script URL (leave blank to reuse current)</label><input type="text" id="nb-script" placeholder="https://script.google.com/..."/></div>
