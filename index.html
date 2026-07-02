@@ -301,7 +301,7 @@ input,select,textarea{font-family:var(--sans)}
     <div class="race-info">
       <div class="race-date" id="race-date-display">November 22, 2026</div>
       <div class="goal-display">
-        <div class="goal-time" id="goal-display">2:50:00</div>
+        <div class="goal-time" id="goal-display">2:49:59</div>
         <div class="goal-pace" id="pace-display">6:27/mi</div>
         <button class="edit-goal-btn" onclick="openGoalModal()">Edit goal</button>
       </div>
@@ -431,7 +431,7 @@ input,select,textarea{font-family:var(--sans)}
     <h3>Edit goal time</h3>
     <div class="form-row">
       <label>Goal time (h:mm:ss)</label>
-      <input type="text" id="goal-input" placeholder="2:50:00"/>
+      <input type="text" id="goal-input" placeholder="2:49:59"/>
     </div>
     <div class="form-row">
       <label>Race date</label>
@@ -582,7 +582,7 @@ let editingActIdx = null;
 let editingDayKey = null; // "weekN-dayI"
 
 const STATE = {
-  goal:      ls("goal")      || "2:50:00",
+  goal:      ls("goal")      || "2:49:59",
   raceDate:  ls("raceDate")  || RACE_DATE_DEFAULT,
   theme:     ls("theme")     || "dark",
   runTypes:  lsJ("runTypes") || [
@@ -630,7 +630,7 @@ function goalToSecs(str) {
   const p=str.trim().split(":").map(Number);
   if(p.length===3) return p[0]*3600+p[1]*60+p[2];
   if(p.length===2) return p[0]*3600+p[1]*60;
-  return 10200; // default 2:50
+  return 10200; // default 2:49:59
 }
 function calcPace(goalStr, distMiles=26.2188) {
   const secs = goalToSecs(goalStr);
@@ -684,7 +684,7 @@ function openGoalModal() {
   openModal("modal-goal");
 }
 function saveGoal() {
-  STATE.goal = document.getElementById("goal-input").value.trim() || "2:50:00";
+  STATE.goal = document.getElementById("goal-input").value.trim() || "2:49:59";
   STATE.raceDate = document.getElementById("race-date-input").value || RACE_DATE_DEFAULT;
   save("goal", STATE.goal); save("raceDate", STATE.raceDate);
   updateGoalDisplay(); closeModal("modal-goal"); toast("Goal updated","ok");
@@ -1585,7 +1585,7 @@ const PHILLY_BLOCK = {
   raceName: "Philadelphia Marathon",
   startDate: "2026-06-22",
   raceDate: "2026-11-22",
-  goal: "2:50:00",
+  goal: "2:49:59",
   color: "#FF6B35",
   scriptUrl: APPS_SCRIPT_URL,
 };
