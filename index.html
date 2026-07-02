@@ -129,6 +129,9 @@ input,select,textarea{font-family:var(--sans)}
 /* ── WORKOUT BOX ── */
 .wo-box{background:var(--sur2);border-radius:var(--r);padding:10px 13px;font-size:12px;line-height:1.6;color:var(--mut)}
 .wo-box b{color:var(--txt);font-weight:500}
+.wo-label-inp{background:none;border:none;border-bottom:1px solid transparent;color:var(--txt);font-weight:500;font-size:12px;font-family:var(--sans);padding:0 2px;cursor:text;min-width:60px;width:auto;transition:border-color .12s}
+.wo-label-inp:hover{border-bottom-color:var(--bdr)}
+.wo-label-inp:focus{outline:none;border-bottom-color:var(--acc)}
 .wo-r{margin-bottom:3px}.wo-r:last-child{margin-bottom:0}
 
 /* ── BUTTONS ── */
@@ -252,7 +255,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="topbar-left">
     <h1>Philly Marathon Dashboard</h1>
     <div class="race-info">
-      <div class="race-date" id="race-date-display">November 21, 2026</div>
+      <div class="race-date" id="race-date-display">November 22, 2026</div>
       <div class="goal-display">
         <div class="goal-time" id="goal-display">2:50:00</div>
         <div class="goal-pace" id="pace-display">6:27/mi</div>
@@ -563,6 +566,7 @@ const STATE = {
   ],
   dayOverrides: lsJ("dayOverrides") || {}, // key: "wN-dI" → {type, notes, actualMiles, shoe}
   actEdits:     lsJ("actEdits")     || {}, // key: stravaId → {name, type, shoe, notes}
+  woLabels:     lsJ("woLabels")     || {}, // key: "wN-wo1" etc → custom label string
 };
 
 function ls(k)  { try { return localStorage.getItem("pm_"+k); } catch(e) { return null; } }
@@ -819,14 +823,20 @@ function renderBlock() {
 
     // Workout details
     const wos = [];
-    if (w.w1) wos.push({l:"Tue AM", t:w.w1});
-    if (w.w2) wos.push({l:"Tue PM", t:w.w2});
-    if (w.w3) wos.push({l:"Fri PM", t:w.w3});
-    if (w.mp) wos.push({l:"MP run",  t:w.mp});
-    if (w.race) wos.push({l:"Race",  t:w.race});
+    if (w.w1) wos.push({key:`w${w.n}-wo1`, defaultLabel:"Workout 1", t:w.w1});
+    if (w.w2) wos.push({key:`w${w.n}-wo2`, defaultLabel:"Workout 2", t:w.w2});
+    if (w.w3) wos.push({key:`w${w.n}-wo3`, defaultLabel:"Workout 3", t:w.w3});
+    if (w.mp) wos.push({key:`w${w.n}-mp`,  defaultLabel:"MP run",    t:w.mp});
+    if (w.race) wos.push({key:`w${w.n}-race`, defaultLabel:"Race",   t:w.race});
     if (wos.length) {
       const wb = document.getElementById("wo-" + w.n);
-      wb.innerHTML = `<div class="wo-box">${wos.map(x=>`<div class="wo-r"><b>${x.l}:</b> ${x.t}</div>`).join("")}</div>`;
+      wb.innerHTML = `<div class="wo-box">${wos.map(x => {
+        const saved = STATE.woLabels && STATE.woLabels[x.key] ? STATE.woLabels[x.key] : x.defaultLabel;
+        return `<div class="wo-r">
+          <input class="wo-label-inp" data-key="${x.key}" value="${saved}" title="Click to rename" onchange="saveWoLabel('${x.key}',this.value)"/>
+          <span style="color:var(--bdr)">:</span> ${x.t}
+        </div>`;
+      }).join("")}</div>`;
     }
   });
 
@@ -893,6 +903,12 @@ function saveDayEdit() {
   closeModal("modal-day");
   renderBlock();
   toast("Day updated");
+}
+
+function saveWoLabel(key, value) {
+  STATE.woLabels[key] = value.trim();
+  save("woLabels", STATE.woLabels);
+  toast("Label updated");
 }
 
 // ═══════════════════════════════════════════════════════════
