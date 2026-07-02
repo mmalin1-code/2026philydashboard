@@ -233,21 +233,58 @@ input,select,textarea{font-family:var(--sans)}
 .toast.ok{border-color:var(--gr);color:var(--gr)}
 .toast.err{border-color:var(--rd);color:var(--rd)}
 
-/* ── UTIL ── */
-.sep{height:1px;background:var(--bdr);margin:16px 0}
-.flex-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ml-auto{margin-left:auto}
-.hide{display:none!important}
-
-@media(max-width:640px){
-  .metrics{grid-template-columns:repeat(2,1fr)}
-  .day-grid{gap:3px}
-  .dc{min-height:56px;padding:6px 2px}
-  .dc-planned{font-size:12px}
+/* ── SIDEBAR ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--sur);border-right:1px solid var(--bdr);display:flex;flex-direction:column;padding:16px 0;transition:transform .2s,width .2s;position:relative;z-index:100}
+.sidebar.collapsed{width:48px}
+.sidebar-toggle{position:absolute;top:14px;right:-14px;width:26px;height:26px;background:var(--sur);border:1px solid var(--bdr);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--mut);z-index:101;box-shadow:var(--shadow)}
+.sidebar-toggle:hover{border-color:var(--acc);color:var(--acc)}
+.sidebar-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);padding:0 16px;margin-bottom:8px;white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .sidebar-label{opacity:0}
+.block-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-left:3px solid transparent;transition:all .12s;min-width:0}
+.block-item:hover{background:var(--sur2)}
+.block-item.active{border-left-color:var(--acc);background:rgba(255,107,53,.08)}
+.block-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.block-info{min-width:0;overflow:hidden}
+.sidebar.collapsed .block-info{display:none}
+.block-name{font-size:13px;font-weight:500;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.block-item.active .block-name{color:var(--acc)}
+.block-meta{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-add{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--mut);font-size:13px;margin-top:4px;border-left:3px solid transparent;transition:all .12s}
+.sidebar-add:hover{color:var(--acc);background:var(--sur2)}
+.sidebar.collapsed .sidebar-add span{display:none}
+.sidebar-sep{height:1px;background:var(--bdr);margin:8px 14px}
+.main-content{flex:1;min-width:0;padding:0 20px 80px}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:200;transform:translateX(-100%)}
+  .sidebar.mobile-open{transform:translateX(0)}
+  .main-content{padding:0 12px 80px}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199}
+  .sidebar-overlay.show{display:block}
 }
 </style>
+
 </head>
 <body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-toggle" onclick="toggleSidebar()" id="sidebar-toggle" title="Collapse">◀</div>
+  <div class="sidebar-label">Training blocks</div>
+  <div id="block-list"></div>
+  <div class="sidebar-sep"></div>
+  <div class="sidebar-add" onclick="openNewBlockModal()">
+    <span style="font-size:16px;line-height:1;flex-shrink:0">+</span>
+    <span>New block</span>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main-content">
 <div class="app">
 
 <!-- TOP BAR -->
@@ -255,7 +292,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="topbar-left">
     <h1>Philly Marathon Dashboard</h1>
     <div class="race-info">
-      <div class="race-date" id="race-date-display">November 22, 2026</div>
+      <div class="race-date" id="race-date-display">November 21, 2026</div>
       <div class="goal-display">
         <div class="goal-time" id="goal-display">2:50:00</div>
         <div class="goal-pace" id="pace-display">6:27/mi</div>
@@ -678,7 +715,7 @@ async function loadFromSheet() {
   const el = document.getElementById("sheet-status-inline");
   el.textContent = "Loading sheet…";
   try {
-    const res = await fetch(APPS_SCRIPT_URL + "?action=plan");
+    const res = await fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=plan");
     const data = await res.json();
     if (data.weeks && data.weeks.length > 0) {
       WEEKS = data.weeks;
@@ -1531,6 +1568,139 @@ async function boot() {
 }
 
 boot();
+
+// ═══════════════════════════════════════════════════════════
+// SIDEBAR & BLOCK SWITCHER
+// ═══════════════════════════════════════════════════════════
+const PHILLY_BLOCK = {
+  id: "philly2026",
+  name: "Philly 2026",
+  raceName: "Philadelphia Marathon",
+  raceDate: "2026-11-21",
+  goal: "2:50:00",
+  color: "#FF6B35",
+  scriptUrl: APPS_SCRIPT_URL,
+};
+
+let BLOCKS = lsJ("pm_blocks") || [PHILLY_BLOCK];
+let activeBlockId = ls("pm_activeBlock") || "philly2026";
+
+function saveBlocks() { save("pm_blocks", BLOCKS); }
+
+function renderSidebar() {
+  const list = document.getElementById("block-list");
+  list.innerHTML = "";
+  BLOCKS.forEach(b => {
+    const item = document.createElement("div");
+    item.className = "block-item" + (b.id === activeBlockId ? " active" : "");
+    item.innerHTML = `
+      <div class="block-dot" style="background:${b.color}"></div>
+      <div class="block-info">
+        <div class="block-name">${b.name}</div>
+        <div class="block-meta">${b.goal} · ${new Date(b.raceDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>
+      </div>`;
+    item.onclick = () => switchBlock(b.id);
+    list.appendChild(item);
+  });
+}
+
+async function switchBlock(id) {
+  if (id === activeBlockId) return;
+  activeBlockId = id;
+  save("pm_activeBlock", id);
+  const block = BLOCKS.find(b => b.id === id);
+  if (!block) return;
+
+  // Update STATE goal/raceDate for this block
+  STATE.goal     = block.goal;
+  STATE.raceDate = block.raceDate;
+  save("goal", STATE.goal);
+  save("raceDate", STATE.raceDate);
+
+  // Update the Apps Script URL in memory (doesn't affect the const)
+  window._activeScriptUrl = block.scriptUrl;
+
+  updateGoalDisplay();
+  renderSidebar();
+
+  // Reload plan from block's sheet
+  const statusEl = document.getElementById("sheet-status-inline");
+  statusEl.textContent = "Loading…";
+  try {
+    const res  = await fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=plan");
+    const data = await res.json();
+    if (data.weeks && data.weeks.length) {
+      WEEKS = data.weeks;
+      statusEl.textContent = "✓ " + block.name + " loaded";
+      statusEl.style.color = "var(--gr)";
+    } else throw new Error("empty");
+  } catch(e) {
+    statusEl.textContent = "Could not load sheet for " + block.name;
+    statusEl.style.color = "var(--mut)";
+  }
+
+  selectedWeekIdx = curWeekIdx();
+  buildWeekStrip();
+  renderBlock();
+  toast("Switched to " + block.name);
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById("sidebar");
+  const toggle = document.getElementById("sidebar-toggle");
+  const overlay = document.getElementById("sidebar-overlay");
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    sb.classList.toggle("mobile-open");
+    overlay.classList.toggle("show");
+  } else {
+    sb.classList.toggle("collapsed");
+    toggle.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
+  }
+}
+
+function openNewBlockModal() {
+  document.getElementById("modal-new-block").classList.add("open");
+}
+
+function saveNewBlock() {
+  const name     = document.getElementById("nb-name").value.trim();
+  const raceName = document.getElementById("nb-racename").value.trim();
+  const raceDate = document.getElementById("nb-date").value;
+  const goal     = document.getElementById("nb-goal").value.trim() || "3:00:00";
+  const scriptUrl= document.getElementById("nb-script").value.trim();
+  const color    = document.getElementById("nb-color").value;
+  if (!name || !raceDate) { toast("Name and race date are required","err"); return; }
+  const id = "block_" + Date.now();
+  BLOCKS.push({ id, name, raceName, raceDate, goal, color, scriptUrl: scriptUrl || APPS_SCRIPT_URL });
+  saveBlocks();
+  closeModal("modal-new-block");
+  renderSidebar();
+  toast("Block added — click it to switch");
+}
+
+renderSidebar();
 </script>
+
+<!-- New Block Modal -->
+<div class="modal-overlay" id="modal-new-block">
+  <div class="modal">
+    <h3>New training block</h3>
+    <div class="form-row"><label>Block name</label><input type="text" id="nb-name" placeholder="e.g. Boston 2027"/></div>
+    <div class="form-row"><label>Race name</label><input type="text" id="nb-racename" placeholder="e.g. Boston Marathon"/></div>
+    <div class="form-row"><label>Race date</label><input type="date" id="nb-date"/></div>
+    <div class="form-row"><label>Goal time</label><input type="text" id="nb-goal" placeholder="e.g. 2:45:00"/></div>
+    <div class="form-row"><label>Apps Script URL (leave blank to reuse current)</label><input type="text" id="nb-script" placeholder="https://script.google.com/..."/></div>
+    <div class="form-row"><label>Color</label><input type="color" id="nb-color" value="#4D9EFF" class="color-input"/></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-new-block')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveNewBlock()">Add block</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .main-content -->
+</div><!-- end .layout -->
+
 </body>
 </html>
