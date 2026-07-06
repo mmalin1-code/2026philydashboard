@@ -62,7 +62,7 @@ input,select,textarea{font-family:var(--sans)}
 .theme-btn:hover{border-color:var(--acc);color:var(--txt)}
 
 /* ── METRICS ── */
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px}
 .met{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:13px 15px}
 .met-l{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:5px}
 .met-v{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1}
@@ -268,7 +268,7 @@ input,select,textarea{font-family:var(--sans)}
 .sidebar-sep{height:1px;background:var(--bdr);margin:10px 0}
 @media(max-width:640px){
   .main-content{padding:0 12px 80px}
-  .metrics{grid-template-columns:repeat(2,1fr)}
+  .metrics{grid-template-columns:repeat(3,1fr)}
   .day-grid{gap:3px}
   .dc{min-height:68px;padding:5px 2px;overflow:hidden}
   .dc-planned{font-size:12px}
@@ -330,6 +330,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="met"><div class="met-l">Goal time</div><div class="met-v" id="goal-display" style="font-size:18px">—</div><div class="met-s"><span id="pace-display" style="font-family:var(--mono)">—</span> · <button class="edit-goal-btn" onclick="openGoalModal()">Edit</button></div></div>
   <div class="met"><div class="met-l">Block miles</div><div class="met-v" id="m-blocktotal">—</div><div class="met-s">planned total</div></div>
   <div class="met"><div class="met-l">This week</div><div class="met-v" id="m-mpw">—</div><div class="met-s">mile goal</div></div>
+  <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of 22</div></div>
   <div class="met"><div class="met-l">Completed</div><div class="met-v" id="m-done">—</div><div class="met-s">miles logged</div></div>
   <div class="met"><div class="met-l">Miles to go</div><div class="met-v" id="m-pct">—</div><div class="met-s" id="m-pct-sub"><div class="prog"><div class="prog-f" id="pbar" style="width:0%"></div></div></div></div>
 </div>
@@ -443,7 +444,7 @@ input,select,textarea{font-family:var(--sans)}
     <h3>Edit goal time</h3>
     <div class="form-row">
       <label>Goal time (h:mm:ss)</label>
-      <input type="text" id="goal-input" placeholder="2:49:59"/>
+      <input type="text" id="goal-input" placeholder="2:50:00"/>
     </div>
     <div class="form-row">
       <label>Race date</label>
@@ -594,7 +595,7 @@ let editingActIdx = null;
 let editingDayKey = null; // "weekN-dayI"
 
 const STATE = {
-  goal:      ls("goal")      || "2:49:59",
+  goal:      ls("goal")      || "2:50:00",
   raceDate:  ls("raceDate")  || RACE_DATE_DEFAULT,
   theme:     ls("theme")     || "dark",
   runTypes:  lsJ("runTypes") || [
@@ -642,7 +643,7 @@ function goalToSecs(str) {
   const p=str.trim().split(":").map(Number);
   if(p.length===3) return p[0]*3600+p[1]*60+p[2];
   if(p.length===2) return p[0]*3600+p[1]*60;
-  return 10200; // default 2:49:59
+  return 10200; // default 2:50
 }
 function calcPace(goalStr, distMiles=26.2188) {
   const secs = goalToSecs(goalStr);
@@ -696,7 +697,7 @@ function openGoalModal() {
   openModal("modal-goal");
 }
 function saveGoal() {
-  STATE.goal = document.getElementById("goal-input").value.trim() || "2:49:59";
+  STATE.goal = document.getElementById("goal-input").value.trim() || "2:50:00";
   STATE.raceDate = document.getElementById("race-date-input").value || RACE_DATE_DEFAULT;
   save("goal", STATE.goal); save("raceDate", STATE.raceDate);
   updateGoalDisplay(); closeModal("modal-goal"); toast("Goal updated","ok");
@@ -1597,7 +1598,7 @@ const PHILLY_BLOCK = {
   raceName: "Philadelphia Marathon",
   startDate: "2026-06-22",
   raceDate: "2026-11-22",
-  goal: "2:49:59",
+  goal: "2:50:00",
   color: "#FF6B35",
   scriptUrl: APPS_SCRIPT_URL,
 };
