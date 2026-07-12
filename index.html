@@ -313,7 +313,7 @@ input,select,textarea{font-family:var(--sans)}
       <span></span><span></span><span></span>
     </button>
     <div>
-      <h1>Philly Marathon Dashboard</h1>
+      <h1 id="dash-title">Philly Marathon Dashboard</h1>
       <div class="race-info">
         <div class="race-date" id="race-date-display">November 22, 2026</div>
       </div>
@@ -585,6 +585,21 @@ input,select,textarea{font-family:var(--sans)}
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
 const RACE_DATE_DEFAULT = "2026-11-22";
 
+// ── Block registry — must be declared before initState ──
+const PHILLY_BLOCK_DEFAULT = {
+  id: "philly2026",
+  name: "Philly 2026",
+  raceName: "Philadelphia Marathon",
+  startDate: "2026-06-22",
+  raceDate: "2026-11-22",
+  goal: "2:49:59",
+  color: "#FF6B35",
+  scriptUrl: APPS_SCRIPT_URL,
+};
+// lsJ/ls not available yet so use inline localStorage
+let BLOCKS = (() => { try { const v=localStorage.getItem("pm_blocks"); return v?JSON.parse(v):null; } catch(e){return null;} })() || [PHILLY_BLOCK_DEFAULT];
+let activeBlockId = (() => { try { return localStorage.getItem("pm_activeBlock")||"philly2026"; } catch(e){return "philly2026";} })();
+
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
@@ -594,11 +609,25 @@ let loadedRuns = [];
 let editingActIdx = null;
 let editingDayKey = null; // "weekN-dayI"
 
-const STATE = {
-  goal:      ls("goal")      || "2:50:00",
-  raceDate:  ls("raceDate")  || RACE_DATE_DEFAULT,
-  theme:     ls("theme")     || "dark",
-  runTypes:  lsJ("runTypes") || [
+// STATE is initialized after activeBlockId is set — see initState() below
+let STATE = {};
+
+// ── global storage (shared across all blocks) ──
+function ls(k)    { try { return localStorage.getItem("pm_"+k); } catch(e) { return null; } }
+function lsJ(k)   { try { const v=localStorage.getItem("pm_"+k); return v?JSON.parse(v):null; } catch(e) { return null; } }
+function save(k,v){ try { localStorage.setItem("pm_"+k, typeof v==="string"?v:JSON.stringify(v)); } catch(e){} }
+
+// ── block-scoped storage (isolated per block) ──
+function bls(k)    { return ls(activeBlockId+"_"+k); }
+function blsJ(k)   { return lsJ(activeBlockId+"_"+k); }
+function bsave(k,v){ save(activeBlockId+"_"+k, v); }
+
+function initState() {
+  const block = (typeof BLOCKS !== "undefined" && BLOCKS.find(b=>b.id===activeBlockId)) || PHILLY_BLOCK;
+  STATE.goal      = bls("goal")      || block.goal      || "2:49:59";
+  STATE.raceDate  = bls("raceDate")  || block.raceDate  || RACE_DATE_DEFAULT;
+  STATE.theme     = ls("theme")      || "dark";
+  STATE.runTypes  = lsJ("runTypes")  || [
     {id:"easy",    name:"Easy",          color:"#6B7494"},
     {id:"workout", name:"Workout",       color:"#3ECF8E"},
     {id:"long",    name:"Long run",      color:"#9B7FEA"},
@@ -606,29 +635,25 @@ const STATE = {
     {id:"race",    name:"Race",          color:"#4D9EFF"},
     {id:"recovery",name:"Recovery",      color:"#F05252"},
     {id:"double",  name:"Double",        color:"#FF6B35"},
-  ],
-  phases: lsJ("phases") || [
+  ];
+  STATE.phases = blsJ("phases") || [
     {id:"base",  name:"Base",  color:"#3ECF8E", wkStart:1,  wkEnd:6},
     {id:"build", name:"Build", color:"#4D9EFF", wkStart:7,  wkEnd:14},
     {id:"peak",  name:"Peak",  color:"#9B7FEA", wkStart:15, wkEnd:19},
     {id:"taper", name:"Taper", color:"#F59E0B", wkStart:20, wkEnd:22},
-  ],
-  shoes:    lsJ("shoes")    || [
+  ];
+  STATE.shoes        = lsJ("shoes")             || [
     {id:"peg42",   name:"Nike Peg 42",       cat:"Easy / daily", miles:0, max:500},
     {id:"nb1080",  name:"NB 1080 V15",       cat:"Recovery",     miles:0, max:500},
     {id:"rebel",   name:"NB Rebel V5",       cat:"Workout",      miles:0, max:400},
     {id:"superb",  name:"ASICS Superblast 3",cat:"Long run",     miles:0, max:400},
     {id:"vfly",    name:"Vaporfly 3.2",      cat:"Race",         miles:0, max:200},
     {id:"rocketx", name:"HOKA Rocket X3",    cat:"Race",         miles:0, max:200},
-  ],
-  dayOverrides: lsJ("dayOverrides") || {}, // key: "wN-dI" → {type, notes, actualMiles, shoe}
-  actEdits:     lsJ("actEdits")     || {}, // key: stravaId → {name, type, shoe, notes}
-  woLabels:     lsJ("woLabels")     || {}, // key: "wN-wo1" etc → custom label string
-};
-
-function ls(k)  { try { return localStorage.getItem("pm_"+k); } catch(e) { return null; } }
-function lsJ(k) { try { const v=localStorage.getItem("pm_"+k); return v?JSON.parse(v):null; } catch(e) { return null; } }
-function save(k,v){ try { localStorage.setItem("pm_"+k, typeof v==="string"?v:JSON.stringify(v)); } catch(e){} }
+  ];
+  STATE.dayOverrides = blsJ("dayOverrides") || {};
+  STATE.actEdits     = blsJ("actEdits")     || {};
+  STATE.woLabels     = blsJ("woLabels")     || {};
+}
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -699,7 +724,7 @@ function openGoalModal() {
 function saveGoal() {
   STATE.goal = document.getElementById("goal-input").value.trim() || "2:50:00";
   STATE.raceDate = document.getElementById("race-date-input").value || RACE_DATE_DEFAULT;
-  save("goal", STATE.goal); save("raceDate", STATE.raceDate);
+  bsave("goal", STATE.goal); bsave("raceDate", STATE.raceDate);
   updateGoalDisplay(); closeModal("modal-goal"); toast("Goal updated","ok");
 }
 
@@ -956,7 +981,7 @@ function saveDayEdit() {
   const type  = document.getElementById("day-type").value;
   const notes = document.getElementById("day-notes").value;
   STATE.dayOverrides[editingDayKey] = { actualMiles: miles||undefined, type: type||undefined, notes: notes||undefined };
-  save("dayOverrides", STATE.dayOverrides);
+  bsave("dayOverrides", STATE.dayOverrides);
   closeModal("modal-day");
   renderBlock();
   toast("Day updated");
@@ -964,7 +989,7 @@ function saveDayEdit() {
 
 function saveWoLabel(key, value) {
   STATE.woLabels[key] = value.trim();
-  save("woLabels", STATE.woLabels);
+  bsave("woLabels", STATE.woLabels);
   toast("Label updated");
 }
 
@@ -1034,7 +1059,7 @@ function savePhases() {
     const e = parseInt(document.getElementById("ph-e-"+ph.id)?.value)||ph.wkEnd;
     ph.wkStart=s; ph.wkEnd=e;
   });
-  save("phases", STATE.phases);
+  bsave("phases", STATE.phases);
   closeModal("modal-phases");
   renderBlock(); buildWeekStrip();
   toast("Phases saved");
@@ -1069,11 +1094,16 @@ function renderChart() {
 function renderBarChart() {
   const svg = document.getElementById("chart-svg");
   if (!WEEKS.length) return;
+  const maxMpw = Math.max(...WEEKS.map(w => w.mpw || 0), 0);
+  if (maxMpw === 0) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="var(--mut)" font-size="13" font-family="var(--sans)">No mileage data yet</text>`;
+    svg.setAttribute("width", 400); svg.setAttribute("height", 100);
+    return;
+  }
   const W = Math.max(svg.parentElement.clientWidth - 40, 400);
   const H = 240, pad = {l:40,r:20,t:20,b:40};
   const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
   const bw = Math.max(4, (iw / WEEKS.length) - 3);
-  const maxMpw = Math.max(...WEEKS.map(w => w.mpw || 0), 10);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
 
   let html = `<g transform="translate(${pad.l},${pad.t})">`;
@@ -1124,10 +1154,13 @@ function renderBarChart() {
 function renderCumChart() {
   const svg = document.getElementById("chart-cum");
   if (!WEEKS.length) return;
-  const W = Math.max(svg.parentElement.clientWidth - 40, 400);
-  const H = 180, pad = {l:40,r:20,t:10,b:30};
-  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
   const totalPlanned = WEEKS.reduce((s,w) => s+(w.mpw||0), 0);
+  if (totalPlanned === 0) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="var(--mut)" font-size="13" font-family="var(--sans)">No mileage data yet</text>`;
+    svg.setAttribute("width", 400); svg.setAttribute("height", 100);
+    return;
+  }
+  const W = Math.max(svg.parentElement.clientWidth - 40, 400);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
 
   let plannedCum = 0, actualCum = 0;
@@ -1374,7 +1407,7 @@ function mapRunsToCalendar(runs) {
   });
 
   if (changed) {
-    save("dayOverrides", STATE.dayOverrides);
+    bsave("dayOverrides", STATE.dayOverrides);
     renderBlock();
   }
 }
@@ -1449,7 +1482,7 @@ function updateActName(i, newName) {
   const run = loadedRuns[i];
   if (!run) return;
   STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), name:newName};
-  save("actEdits", STATE.actEdits);
+  bsave("actEdits", STATE.actEdits);
 }
 
 function openActEdit(i) {
@@ -1483,7 +1516,7 @@ function saveActEdit() {
     shoe:  newShoe,
     notes: document.getElementById("act-notes-inp").value,
   };
-  save("actEdits", STATE.actEdits);
+  bsave("actEdits", STATE.actEdits);
   closeModal("modal-act");
   renderActivities(loadedRuns);
   renderShoes();
@@ -1501,7 +1534,7 @@ function assignShoe(i, shoeId) {
   }
   if (shoeId && shoeId !== prev) addMilesToShoe(shoeId, dist);
   STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe:shoeId};
-  save("actEdits", STATE.actEdits);
+  bsave("actEdits", STATE.actEdits);
   renderShoes();
   toast("Shoe assigned");
 }
@@ -1565,8 +1598,19 @@ function toast(msg, type="ok") {
 // BOOT
 // ═══════════════════════════════════════════════════════════
 async function boot() {
+  initState();
   applyTheme(STATE.theme);
   updateGoalDisplay();
+
+  // Set active script URL from the currently active block on load
+  const activeBlock = BLOCKS.find(b => b.id === activeBlockId);
+  window._activeScriptUrl = (activeBlock && activeBlock.scriptUrl) ? activeBlock.scriptUrl : APPS_SCRIPT_URL;
+
+  // Update title and page title
+  const titleEl = document.getElementById("dash-title");
+  if (titleEl && activeBlock) titleEl.textContent = activeBlock.raceName || activeBlock.name || "Marathon Dashboard";
+  document.title = (activeBlock ? activeBlock.name : "Philly 2026") + " Dashboard";
+
   await loadFromSheet();
   buildWeekStrip();
   selectedWeekIdx = curWeekIdx();
@@ -1592,19 +1636,6 @@ boot();
 // ═══════════════════════════════════════════════════════════
 // SIDEBAR & BLOCK SWITCHER
 // ═══════════════════════════════════════════════════════════
-const PHILLY_BLOCK = {
-  id: "philly2026",
-  name: "Philly 2026",
-  raceName: "Philadelphia Marathon",
-  startDate: "2026-06-22",
-  raceDate: "2026-11-22",
-  goal: "2:50:00",
-  color: "#FF6B35",
-  scriptUrl: APPS_SCRIPT_URL,
-};
-
-let BLOCKS = lsJ("pm_blocks") || [PHILLY_BLOCK];
-let activeBlockId = ls("pm_activeBlock") || "philly2026";
 
 function saveBlocks() { save("pm_blocks", BLOCKS); }
 
@@ -1667,14 +1698,22 @@ async function switchBlock(id) {
   const block = BLOCKS.find(b => b.id === id);
   if (!block) return;
 
-  // Update STATE goal/raceDate for this block
-  STATE.goal     = block.goal;
-  STATE.raceDate = block.raceDate;
-  save("goal", STATE.goal);
-  save("raceDate", STATE.raceDate);
+  // Reload all block-scoped state from localStorage for this block
+  initState();
 
-  // Update the Apps Script URL in memory (doesn't affect the const)
+  // Update the Apps Script URL in memory
   window._activeScriptUrl = block.scriptUrl;
+
+  // Update dashboard title
+  const titleEl = document.getElementById("dash-title");
+  if (titleEl) titleEl.textContent = block.raceName || block.name || "Marathon Dashboard";
+  document.title = block.name + " Dashboard";
+
+  // Clear stale Strava runs from previous block
+  loadedRuns = [];
+  document.getElementById("acts-list").innerHTML = "";
+  document.getElementById("pred-card").style.display = "none";
+  document.getElementById("acts-status").textContent = "";
 
   updateGoalDisplay();
   renderSidebar();
