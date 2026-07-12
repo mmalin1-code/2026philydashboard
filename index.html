@@ -947,10 +947,10 @@ function guessRunType(w, di) {
   const mi = w.days[di];
   if (mi === "OFF") return null;
   if (w.race && di === 6 && (mi+"").includes("26")) return "race";
+  if (di === 6 && w.mp) return "mp";
   if (di === 6) return "long";
   if (di === 1 && (w.w1 || w.w2)) return "workout";
   if (di === 4 && w.w3) return "workout";
-  if (w.mp && di === 5) return "mp";
   return "easy";
 }
 
