@@ -966,7 +966,7 @@ function openDayEdit(wn, di, e) {
 
   document.getElementById("modal-day-title").textContent = `Week ${wn} · ${DN[di]}`;
   document.getElementById("day-miles").value = ov.actualMiles || planned || "";
-  document.getElementById("day-notes").value = ov.notes || w.w1 || "";
+  document.getElementById("day-notes").value = ov.notes || "";
 
   const sel = document.getElementById("day-type");
   sel.innerHTML = `<option value="">— Select type —</option>` +
@@ -979,8 +979,14 @@ function saveDayEdit() {
   if (!editingDayKey) return;
   const miles = parseFloat(document.getElementById("day-miles").value) || 0;
   const type  = document.getElementById("day-type").value;
-  const notes = document.getElementById("day-notes").value;
-  STATE.dayOverrides[editingDayKey] = { actualMiles: miles||undefined, type: type||undefined, notes: notes||undefined };
+  const notes = document.getElementById("day-notes").value.trim();
+  const existing = STATE.dayOverrides[editingDayKey] || {};
+  STATE.dayOverrides[editingDayKey] = {
+    ...existing,
+    actualMiles: miles || existing.actualMiles || undefined,
+    type:        type  || existing.type        || undefined,
+    notes:       notes || undefined,  // empty string = delete the note
+  };
   bsave("dayOverrides", STATE.dayOverrides);
   closeModal("modal-day");
   renderBlock();
@@ -1400,7 +1406,7 @@ function mapRunsToCalendar(runs) {
         ...existing,
         actualMiles: parseFloat(totalMiles.toFixed(2)),
         fromStrava: true,
-        notes: existing.notes || dayRuns.map(r=>r.name).join(" + "),
+        notes: existing.notes || "",
       };
       changed = true;
     }
@@ -1637,7 +1643,9 @@ boot();
 // SIDEBAR & BLOCK SWITCHER
 // ═══════════════════════════════════════════════════════════
 
-function saveBlocks() { save("pm_blocks", BLOCKS); }
+function saveBlocks() {
+  try { localStorage.setItem("pm_blocks", JSON.stringify(BLOCKS)); } catch(e) {}
+}
 
 function renderSidebar() {
   const list = document.getElementById("block-list");
@@ -1694,7 +1702,7 @@ function deleteBlock(id, e) {
 async function switchBlock(id) {
   if (id === activeBlockId) { closeSidebar(); return; }
   activeBlockId = id;
-  save("pm_activeBlock", id);
+  try { localStorage.setItem("pm_activeBlock", id); } catch(e) {}
   const block = BLOCKS.find(b => b.id === id);
   if (!block) return;
 
