@@ -330,7 +330,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="met"><div class="met-l">Goal time</div><div class="met-v" id="goal-display" style="font-size:18px">—</div><div class="met-s"><span id="pace-display" style="font-family:var(--mono)">—</span> · <button class="edit-goal-btn" onclick="openGoalModal()">Edit</button></div></div>
   <div class="met"><div class="met-l">Block miles</div><div class="met-v" id="m-blocktotal">—</div><div class="met-s">planned total</div></div>
   <div class="met"><div class="met-l">This week</div><div class="met-v" id="m-mpw">—</div><div class="met-s">mile goal</div></div>
-  <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of 22</div></div>
+  <div class="met"><div class="met-l">Week</div><div class="met-v" id="m-wk">—</div><div class="met-s">of <span id="m-wk-total">—</span></div></div>
   <div class="met"><div class="met-l">Completed</div><div class="met-v" id="m-done">—</div><div class="met-s">miles logged</div></div>
   <div class="met"><div class="met-l">Miles to go</div><div class="met-v" id="m-pct">—</div><div class="met-s" id="m-pct-sub"><div class="prog"><div class="prog-f" id="pbar" style="width:0%"></div></div></div></div>
 </div>
@@ -1079,6 +1079,7 @@ function updateMetrics() {
   const cw = WEEKS[ci] || WEEKS[0] || {};
   document.getElementById("m-mpw").textContent = cw.mpw || "—";
   document.getElementById("m-wk").textContent  = cw.n   || "—";
+  document.getElementById("m-wk-total").textContent = WEEKS.length || "—";
   const done = parseFloat(totalActualMiles());
   document.getElementById("m-done").textContent = done.toFixed(2);
   const blockTotal = WEEKS.reduce((s,w)=>s+(w.mpw||0),0);
@@ -1167,6 +1168,8 @@ function renderCumChart() {
     return;
   }
   const W = Math.max(svg.parentElement.clientWidth - 40, 400);
+  const H = 180, pad = {l:40,r:20,t:10,b:30};
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
   svg.setAttribute("width", W); svg.setAttribute("height", H);
 
   let plannedCum = 0, actualCum = 0;
