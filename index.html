@@ -450,6 +450,10 @@ input,select,textarea{font-family:var(--sans)}
       <label>Race date</label>
       <input type="date" id="race-date-input" value="2026-11-22"/>
     </div>
+    <div class="form-row">
+      <label>Block end date <span style="color:var(--mut);font-weight:400">(optional — if different from race date)</span></label>
+      <input type="date" id="block-end-input"/>
+    </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-goal')">Cancel</button>
       <button class="btn btn-acc" onclick="saveGoal()">Save</button>
@@ -714,7 +718,9 @@ function updateGoalDisplay() {
   const rd = new Date(STATE.raceDate+"T00:00:00");
   document.getElementById("race-date-display").textContent = rd.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
   const days = Math.max(0,Math.ceil((rd-new Date())/86400000));
-  document.getElementById("countdown").innerHTML = `<span>${days}</span> days to Philly`;
+  const block = BLOCKS.find(b => b.id === activeBlockId);
+  const raceName = (block && block.raceName) ? block.raceName : (block && block.name) ? block.name : "race";
+  document.getElementById("countdown").innerHTML = `<span>${days}</span> days to ${raceName}`;
 }
 function openGoalModal() {
   document.getElementById("goal-input").value = STATE.goal;
