@@ -719,13 +719,30 @@ function updateGoalDisplay() {
 function openGoalModal() {
   document.getElementById("goal-input").value = STATE.goal;
   document.getElementById("race-date-input").value = STATE.raceDate;
+  // pre-fill end date from the active block
+  const block = BLOCKS.find(b => b.id === activeBlockId);
+  document.getElementById("block-end-input").value = (block && block.endDate) ? block.endDate : "";
   openModal("modal-goal");
 }
+
 function saveGoal() {
-  STATE.goal = document.getElementById("goal-input").value.trim() || "2:50:00";
+  STATE.goal     = document.getElementById("goal-input").value.trim() || "2:49:59";
   STATE.raceDate = document.getElementById("race-date-input").value || RACE_DATE_DEFAULT;
-  bsave("goal", STATE.goal); bsave("raceDate", STATE.raceDate);
-  updateGoalDisplay(); closeModal("modal-goal"); toast("Goal updated","ok");
+  const endDate  = document.getElementById("block-end-input").value;
+  bsave("goal", STATE.goal);
+  bsave("raceDate", STATE.raceDate);
+
+  // Save end date onto the block itself
+  const block = BLOCKS.find(b => b.id === activeBlockId);
+  if (block) {
+    block.endDate = endDate || block.raceDate;
+    saveBlocks();
+    renderSidebar();
+  }
+
+  updateGoalDisplay();
+  closeModal("modal-goal");
+  toast("Goal updated", "ok");
 }
 
 // ═══════════════════════════════════════════════════════════
