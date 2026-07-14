@@ -262,6 +262,9 @@ input,select,textarea{font-family:var(--sans)}
 .block-del-btn{background:none;border:none;color:var(--mut);font-size:11px;padding:0 2px;cursor:pointer;flex-shrink:0;opacity:0;transition:opacity .12s}
 .block-item:hover .block-del-btn{opacity:1}
 .block-del-btn:hover{color:var(--rd)}
+.block-edit-btn{background:none;border:none;color:var(--mut);font-size:12px;padding:0 2px;cursor:pointer;flex-shrink:0;opacity:0;transition:opacity .12s}
+.block-item:hover .block-edit-btn{opacity:1}
+.block-edit-btn:hover{color:var(--bl)}
 .block-meta{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .sidebar-add{display:flex;align-items:center;gap:8px;padding:10px 8px;cursor:pointer;color:var(--mut);font-size:13px;border-radius:var(--r);transition:all .12s;margin-top:4px}
 .sidebar-add:hover{color:var(--acc);background:var(--sur2)}
@@ -1691,7 +1694,8 @@ function renderSidebar() {
     const startLabel = b.startDate
       ? new Date(b.startDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})
       : "—";
-    const endLabel = new Date(b.raceDate+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    const blockEnd = b.endDate || b.raceDate;
+    const endLabel = new Date(blockEnd+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
 
     item.innerHTML = `
       <div class="block-dot" style="background:${b.color};flex-shrink:0"></div>
@@ -1701,6 +1705,7 @@ function renderSidebar() {
             onclick="event.stopPropagation()"
             onchange="renameBlock('${b.id}',this.value)"
             title="Click to rename"/>
+          <button class="block-edit-btn" onclick="openBlockEdit('${b.id}',event)" title="Edit block dates">✎</button>
           <button class="block-del-btn" onclick="deleteBlock('${b.id}',event)" title="Remove block">✕</button>
         </div>
         <div class="block-meta">${b.goal} · ${startLabel}–${endLabel}</div>
@@ -1809,8 +1814,69 @@ function saveNewBlock() {
   toast("Block added — click it to switch");
 }
 
+let editingBlockId = null;
+
+function openBlockEdit(id, e) {
+  e && e.stopPropagation();
+  const b = BLOCKS.find(x => x.id === id);
+  if (!b) return;
+  editingBlockId = id;
+  document.getElementById("be-name").value     = b.name      || "";
+  document.getElementById("be-racename").value = b.raceName  || "";
+  document.getElementById("be-goal").value     = b.goal      || "";
+  document.getElementById("be-start").value    = b.startDate || "";
+  document.getElementById("be-racedate").value = b.raceDate  || "";
+  document.getElementById("be-enddate").value  = b.endDate   || "";
+  document.getElementById("be-color").value    = b.color     || "#FF6B35";
+  document.getElementById("be-script").value   = b.scriptUrl || "";
+  openModal("modal-block-edit");
+}
+
+function saveBlockEdit() {
+  const b = BLOCKS.find(x => x.id === editingBlockId);
+  if (!b) return;
+  b.name      = document.getElementById("be-name").value.trim()     || b.name;
+  b.raceName  = document.getElementById("be-racename").value.trim() || b.raceName;
+  b.goal      = document.getElementById("be-goal").value.trim()     || b.goal;
+  b.startDate = document.getElementById("be-start").value           || b.startDate;
+  b.raceDate  = document.getElementById("be-racedate").value        || b.raceDate;
+  b.endDate   = document.getElementById("be-enddate").value         || b.raceDate;
+  b.color     = document.getElementById("be-color").value;
+  b.scriptUrl = document.getElementById("be-script").value.trim()   || b.scriptUrl;
+  saveBlocks();
+  if (editingBlockId === activeBlockId) {
+    STATE.goal     = b.goal;
+    STATE.raceDate = b.raceDate;
+    bsave("goal",     STATE.goal);
+    bsave("raceDate", STATE.raceDate);
+    updateGoalDisplay();
+  }
+  closeModal("modal-block-edit");
+  renderSidebar();
+  toast("Block updated");
+}
+
 renderSidebar();
 </script>
+
+<!-- Block Edit Modal -->
+<div class="modal-overlay" id="modal-block-edit">
+  <div class="modal">
+    <h3>Edit block</h3>
+    <div class="form-row"><label>Block name</label><input type="text" id="be-name"/></div>
+    <div class="form-row"><label>Race name</label><input type="text" id="be-racename"/></div>
+    <div class="form-row"><label>Goal time</label><input type="text" id="be-goal" placeholder="2:49:59"/></div>
+    <div class="form-row"><label>Block start date</label><input type="date" id="be-start"/></div>
+    <div class="form-row"><label>Race date</label><input type="date" id="be-racedate"/></div>
+    <div class="form-row"><label>Block end date <span style="color:var(--mut);font-weight:400">(if different from race date)</span></label><input type="date" id="be-enddate"/></div>
+    <div class="form-row"><label>Color</label><input type="color" id="be-color" class="color-input"/></div>
+    <div class="form-row"><label>Apps Script URL</label><input type="text" id="be-script"/></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-block-edit')">Cancel</button>
+      <button class="btn btn-acc" onclick="saveBlockEdit()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- New Block Modal -->
 <div class="modal-overlay" id="modal-new-block">
