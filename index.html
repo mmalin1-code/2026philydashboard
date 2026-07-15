@@ -627,7 +627,50 @@ function save(k,v){ try { localStorage.setItem("pm_"+k, typeof v==="string"?v:JS
 // ── block-scoped storage (isolated per block) ──
 function bls(k)    { return ls(activeBlockId+"_"+k); }
 function blsJ(k)   { return lsJ(activeBlockId+"_"+k); }
-function bsave(k,v){ save(activeBlockId+"_"+k, v); }
+function bsave(k,v){
+  // save locally first (instant)
+  save(activeBlockId+"_"+k, v);
+  // then sync to sheet in background (don't await — fire and forget)
+  syncSettingToSheet(k, v);
+}
+
+// Sync a single setting key/value to the Google Sheet Settings tab
+function syncSettingToSheet(key, value) {
+  const block = BLOCKS.find(b => b.id === activeBlockId);
+  const url = (block && block.scriptUrl) ? block.scriptUrl : APPS_SCRIPT_URL;
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "savesettings", blockId: activeBlockId, key, value })
+  }).catch(e => console.warn("Settings sync failed:", key, e));
+}
+
+// Load all settings for the active block from the sheet and apply to STATE
+async function loadSettingsFromSheet() {
+  const block = BLOCKS.find(b => b.id === activeBlockId);
+  const url = (block && block.scriptUrl) ? block.scriptUrl : APPS_SCRIPT_URL;
+  try {
+    const res  = await fetch(url + "?action=getsettings&blockId=" + encodeURIComponent(activeBlockId));
+    const data = await res.json();
+    if (data.error || !data.settings) return;
+    const s = data.settings;
+
+    // Apply each synced setting — sheet wins over localStorage for these keys
+    if (s.goal)         { STATE.goal         = s.goal;         save(activeBlockId+"_goal",         STATE.goal); }
+    if (s.raceDate)     { STATE.raceDate     = s.raceDate;     save(activeBlockId+"_raceDate",     STATE.raceDate); }
+    if (s.dayOverrides) { STATE.dayOverrides = s.dayOverrides; save(activeBlockId+"_dayOverrides", STATE.dayOverrides); }
+    if (s.woLabels)     { STATE.woLabels     = s.woLabels;     save(activeBlockId+"_woLabels",     STATE.woLabels); }
+    if (s.phases)       { STATE.phases       = s.phases;       save(activeBlockId+"_phases",       STATE.phases); }
+    if (s.shoes)        { STATE.shoes        = s.shoes;        save("shoes",                       STATE.shoes); }
+    if (s.runTypes)     { STATE.runTypes     = s.runTypes;     save("runTypes",                    STATE.runTypes); }
+
+    console.log("Settings loaded from sheet for", activeBlockId);
+    return true;
+  } catch(e) {
+    console.warn("Could not load settings from sheet:", e);
+    return false;
+  }
+}
 
 function initState() {
   const block = (typeof BLOCKS !== "undefined" && BLOCKS.find(b=>b.id===activeBlockId)) || PHILLY_BLOCK;
@@ -1044,7 +1087,7 @@ function renderRunTypesGrid() {
 }
 function updateRTColor(id, color) {
   const rt = STATE.runTypes.find(r => r.id===id);
-  if (rt) { rt.color=color; save("runTypes",STATE.runTypes); renderBlock(); }
+  if (rt) { rt.color=color; save("runTypes",STATE.runTypes); syncSettingToSheet("runTypes",STATE.runTypes); renderBlock(); }
 }
 function deleteRunType(id) {
   STATE.runTypes = STATE.runTypes.filter(r => r.id !== id);
@@ -1259,19 +1302,19 @@ function saveShoe() {
   const miles = parseFloat(document.getElementById("shoe-miles-inp").value)||0;
   const max   = parseFloat(document.getElementById("shoe-max-inp").value)||400;
   STATE.shoes.push({id,name,cat,miles,max});
-  save("shoes", STATE.shoes);
+  save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes);
   closeModal("modal-shoe");
   renderShoes(); toast("Shoe added");
 }
 function deleteShoe(id) {
   if (!confirm("Remove this shoe?")) return;
   STATE.shoes = STATE.shoes.filter(s => s.id !== id);
-  save("shoes", STATE.shoes);
+  save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes);
   renderShoes();
 }
 function addMilesToShoe(shoeId, miles) {
   const shoe = STATE.shoes.find(s => s.id===shoeId);
-  if (shoe) { shoe.miles = parseFloat((shoe.miles + miles).toFixed(2)); save("shoes", STATE.shoes); renderShoes(); }
+  if (shoe) { shoe.miles = parseFloat((shoe.miles + miles).toFixed(2)); save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes); renderShoes(); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1541,7 +1584,7 @@ function saveActEdit() {
   // update shoe mileage
   if (prevShoe && prevShoe !== newShoe) {
     const ps = STATE.shoes.find(s=>s.id===prevShoe);
-    if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles - dist).toFixed(2))); save("shoes", STATE.shoes); }
+    if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles - dist).toFixed(2))); save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes); }
   }
   if (newShoe && newShoe !== prevShoe) addMilesToShoe(newShoe, dist);
 
@@ -1565,7 +1608,7 @@ function assignShoe(i, shoeId) {
   const dist = parseFloat(fmtDist(run.distance||0));
   if (prev && prev !== shoeId) {
     const ps = STATE.shoes.find(s=>s.id===prev);
-    if (ps) { ps.miles = Math.max(0,parseFloat((ps.miles-dist).toFixed(2))); save("shoes",STATE.shoes); }
+    if (ps) { ps.miles = Math.max(0,parseFloat((ps.miles-dist).toFixed(2))); save("shoes",STATE.shoes); syncSettingToSheet("shoes",STATE.shoes); }
   }
   if (shoeId && shoeId !== prev) addMilesToShoe(shoeId, dist);
   STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe:shoeId};
@@ -1670,7 +1713,19 @@ async function boot() {
   if (titleEl && activeBlock) titleEl.textContent = activeBlock.raceName || activeBlock.name || "Marathon Dashboard";
   document.title = (activeBlock ? activeBlock.name : "Philly 2026") + " Dashboard";
 
-  await loadFromSheet();
+  // Show sync status
+  const statusEl = document.getElementById("sheet-status-inline");
+  if (statusEl) { statusEl.textContent = "Syncing…"; statusEl.style.color = "var(--mut)"; }
+
+  // Load plan and settings from sheet in parallel
+  const [, settingsLoaded] = await Promise.all([loadFromSheet(), loadSettingsFromSheet()]);
+
+  // Re-apply state after sheet load in case settings updated anything
+  if (settingsLoaded) {
+    updateGoalDisplay();
+    if (statusEl) { statusEl.textContent = "✓ Synced from sheet"; statusEl.style.color = "var(--gr)"; }
+  }
+
   buildWeekStrip();
   selectedWeekIdx = curWeekIdx();
   document.querySelectorAll(".wchip").forEach((x,j)=>x.classList.toggle("on",j===selectedWeekIdx));
@@ -1785,8 +1840,11 @@ async function switchBlock(id) {
   const statusEl = document.getElementById("sheet-status-inline");
   statusEl.textContent = "Loading…";
   try {
-    const res  = await fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=plan");
-    const data = await res.json();
+    const [planRes, ] = await Promise.all([
+      fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=plan"),
+      loadSettingsFromSheet()
+    ]);
+    const data = await planRes.json();
     if (data.weeks && data.weeks.length) {
       WEEKS = data.weeks;
       statusEl.textContent = "✓ " + block.name + " loaded";
@@ -1797,9 +1855,11 @@ async function switchBlock(id) {
     statusEl.style.color = "var(--mut)";
   }
 
+  updateGoalDisplay();
   selectedWeekIdx = curWeekIdx();
   buildWeekStrip();
   renderBlock();
+  renderShoes();
   closeSidebar();
   toast("Switched to " + block.name);
 }
