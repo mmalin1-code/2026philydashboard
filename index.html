@@ -589,7 +589,8 @@ input,select,textarea{font-family:var(--sans)}
 // ═══════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
+const APPS_SCRIPT_URL  = "https://script.google.com/macros/s/AKfycby4mKdSgykd05mxfkZ2bhiUAALnQW1UwCwGX0C5AQ5a8jTtlts3rJdzdZKDSLe4ddrg/exec";
+const SETTINGS_URL     = "https://script.google.com/macros/s/AKfycbyKUE6--TpaSCiGnJwL764TbIP5roUmssRG87X_24cv7omaSwRBI5MUy7sMZd1dRVEPjQ/exec";
 const RACE_DATE_DEFAULT = "2026-11-22";
 
 // ── Block registry — must be declared before initState ──
@@ -636,9 +637,7 @@ function bsave(k,v){
 
 // Sync a single setting key/value to the Google Sheet Settings tab
 function syncSettingToSheet(key, value) {
-  const block = BLOCKS.find(b => b.id === activeBlockId);
-  const url = (block && block.scriptUrl) ? block.scriptUrl : APPS_SCRIPT_URL;
-  fetch(url, {
+  fetch(SETTINGS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ action: "savesettings", blockId: activeBlockId, key, value })
@@ -647,10 +646,8 @@ function syncSettingToSheet(key, value) {
 
 // Load all settings for the active block from the sheet and apply to STATE
 async function loadSettingsFromSheet() {
-  const block = BLOCKS.find(b => b.id === activeBlockId);
-  const url = (block && block.scriptUrl) ? block.scriptUrl : APPS_SCRIPT_URL;
   try {
-    const res  = await fetch(url + "?action=getsettings&blockId=" + encodeURIComponent(activeBlockId));
+    const res  = await fetch(SETTINGS_URL + "?action=getsettings&blockId=" + encodeURIComponent(activeBlockId));
     const data = await res.json();
     if (data.error || !data.settings) return;
     const s = data.settings;
