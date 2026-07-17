@@ -324,6 +324,7 @@ input,select,textarea{font-family:var(--sans)}
   </div>
   <div class="topbar-right">
     <div class="countdown" id="countdown"></div>
+    <button class="theme-btn" id="sync-btn" onclick="manualSync()" title="Sync settings across devices">⟳ Sync</button>
     <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
   </div>
 </div>
@@ -751,6 +752,23 @@ function applyTheme(t) {
   STATE.theme = t; save("theme", t);
 }
 function toggleTheme() { applyTheme(STATE.theme==="dark"?"light":"dark"); }
+
+async function manualSync() {
+  const btn = document.getElementById("sync-btn");
+  btn.textContent = "⟳ Syncing…";
+  btn.disabled = true;
+  const loaded = await loadSettingsFromSheet();
+  if (loaded) {
+    updateGoalDisplay();
+    renderBlock();
+    renderShoes();
+    toast("Synced from Settings sheet");
+  } else {
+    toast("Sync failed — check connection", "err");
+  }
+  btn.textContent = "⟳ Sync";
+  btn.disabled = false;
+}
 
 // ═══════════════════════════════════════════════════════════
 // GOAL / COUNTDOWN
@@ -1603,13 +1621,22 @@ function assignShoe(i, shoeId) {
   if (!run) return;
   const prev = (STATE.actEdits[run.id]||{}).shoe;
   const dist = parseFloat(fmtDist(run.distance||0));
+  // remove miles from old shoe
   if (prev && prev !== shoeId) {
     const ps = STATE.shoes.find(s=>s.id===prev);
-    if (ps) { ps.miles = Math.max(0,parseFloat((ps.miles-dist).toFixed(2))); save("shoes",STATE.shoes); syncSettingToSheet("shoes",STATE.shoes); }
+    if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles-dist).toFixed(2))); }
   }
-  if (shoeId && shoeId !== prev) addMilesToShoe(shoeId, dist);
+  // add miles to new shoe
+  if (shoeId && shoeId !== prev) {
+    const ns = STATE.shoes.find(s=>s.id===shoeId);
+    if (ns) { ns.miles = parseFloat((ns.miles+dist).toFixed(2)); }
+  }
   STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe:shoeId};
+  // always save and sync after any shoe change
+  save("shoes", STATE.shoes);
+  syncSettingToSheet("shoes", STATE.shoes);
   bsave("actEdits", STATE.actEdits);
+  syncSettingToSheet("actEdits", STATE.actEdits);
   renderShoes();
   toast("Shoe assigned");
 }
