@@ -406,27 +406,57 @@ input,select,textarea{font-family:var(--sans)}
 <!-- ═══ PACE CALCULATOR ═══ -->
 <div class="pane" id="pane-paces">
   <div style="max-width:560px">
-    <div style="margin-bottom:18px">
-      <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Training pace zones</h3>
-      <p style="font-size:13px;color:var(--mut)">Calculated from your marathon goal time using Jack Daniels VDOT methodology.</p>
-    </div>
+
+    <h3 style="font-size:18px;font-weight:500;margin-bottom:4px">
+      Pace Calculator
+    </h3>
+
+    <p style="font-size:13px;color:var(--mut);margin-bottom:20px">
+      Training zones based on your goal time
+    </p>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+
       <div>
-        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);display:block;margin-bottom:5px">Goal time</label>
-        <input id="pc-goal" type="text" placeholder="h:mm:ss" oninput="calcPaces()" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 13px;font-size:15px;font-weight:500;color:var(--txt);font-family:var(--mono)"/>
+        <label style="font-size:12px;color:var(--mut);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">
+          Goal Time
+        </label>
+
+        <input
+          id="pc-goal"
+          type="text"
+          value="2:49:59"
+          placeholder="h:mm:ss"
+          oninput="calcPaces()"
+          style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 13px;font-size:15px;font-weight:500;color:var(--txt)"
+        >
       </div>
+
       <div>
-        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);display:block;margin-bottom:5px">Distance</label>
-        <select id="pc-dist" onchange="calcPaces()" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 13px;font-size:14px;color:var(--txt)">
+        <label style="font-size:12px;color:var(--mut);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">
+          Distance
+        </label>
+
+        <select
+          id="pc-dist"
+          onchange="calcPaces()"
+          style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 13px;font-size:15px;color:var(--txt)"
+        >
           <option value="26.2188">Marathon</option>
-          <option value="13.1094">Half marathon</option>
+          <option value="13.1094">Half Marathon</option>
           <option value="6.2137">10K</option>
           <option value="3.1068">5K</option>
         </select>
       </div>
+
     </div>
+
     <div id="pace-zones"></div>
-    <p style="font-size:12px;color:var(--mut);margin-top:14px;line-height:1.6">Easy = daily aerobic base · Threshold = comfortably hard, ~1hr race effort · Interval = VO₂max, 3–5 min reps · Repetition = short fast reps 200–400m</p>
+
+    <p style="font-size:12px;color:var(--mut);margin-top:14px;line-height:1.6">
+      Based on Jack Daniels VDOT methodology. Easy = 59–74% VO₂max, Threshold = ~1 hour race effort, Interval = VO₂max (3–5K effort), Repetition = short fast reps (200–400m).
+    </p>
+
   </div>
 </div>
 
