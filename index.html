@@ -1854,16 +1854,17 @@ async function boot() {
 // PACE CALCULATOR  (Jack Daniels VDOT)
 // ═══════════════════════════════════════════════════════════
 function _pcSecPerMile(vo2) {
-  // Invert JD VO2-at-pace formula to get sec/mile from a VO2 value
-  // VO2(v) = -4.6 + 0.182258v + 0.000104v²   (v in m/min)
+  // Invert JD VO2-at-pace: VO2(v) = -4.6 + 0.182258v + 0.000104v²  (v in m/min)
   const a = 0.000104, b = 0.182258, c = -(vo2 + 4.6);
   const vMpm = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a); // m/min
-  return (1609.34 / vMpm) * 60; // sec/mile
+  // vMpm = meters per minute -> sec per meter = 1/vMpm*60 -> sec per mile = *1609.34
+  return (1 / vMpm) * 60 * 1609.34;
 }
 function _pcVdot(totalSec) {
-  // JD VDOT from marathon finish time (seconds)
-  const t = totalSec / 60;           // minutes
-  const v = 26.2188 / t;             // miles per minute
+  // JD VDOT — v must be in m/min, not miles/min
+  const distM = 26.2188 * 1609.34;   // marathon in meters (~42195)
+  const t     = totalSec / 60;       // minutes
+  const v     = distM / t;           // m/min
   const num = -4.6 + 0.182258 * v + 0.000104 * v * v;
   const den = 0.8 + 0.1894393 * Math.exp(-0.012778 * t) + 0.2989558 * Math.exp(-0.1932605 * t);
   return num / den;
@@ -1904,11 +1905,11 @@ function calcPaceZones() {
 
   // Zone paces (sec/mile)
   const zones = [
-    { name:"Easy",             pct1:0.62, pct2:0.68, color:"var(--gr)",  desc:"Daily easy / long run base" },
-    { name:"Marathon Pace",    pct1:0.80, pct2:0.80, color:"var(--bl)",  desc:"Goal race effort" },
-    { name:"Threshold (LT)",   pct1:0.89, pct2:0.89, color:"var(--am)",  desc:"Tempo / cruise intervals" },
+    { name:"Easy",             pct1:0.59, pct2:0.65, color:"var(--gr)",  desc:"Daily easy / long run base" },
+    { name:"Marathon Pace",    pct1:0.83, pct2:0.83, color:"var(--bl)",  desc:"Goal race effort" },
+    { name:"Threshold (LT)",   pct1:0.88, pct2:0.88, color:"var(--am)",  desc:"Tempo / cruise intervals" },
     { name:"Interval (VO₂)",   pct1:0.98, pct2:0.98, color:"var(--pu)",  desc:"800m–1600m repeats" },
-    { name:"Repetition",       pct1:1.07, pct2:1.07, color:"var(--rd)",  desc:"200–400m speed work" },
+    { name:"Repetition",       pct1:1.05, pct2:1.05, color:"var(--rd)",  desc:"200–400m speed work" },
   ];
 
   const zonesEl = document.getElementById("pc-zones");
@@ -1924,7 +1925,7 @@ function calcPaceZones() {
   }).join("");
 
   // MP splits
-  const mpSec = _pcSecPerMile(0.80 * vdot);
+  const mpSec = _pcSecPerMile(0.83 * vdot);
   const splits = [
     { label:"1 Mile",        mi:1 },
     { label:"5K",            mi:3.10686 },
