@@ -345,7 +345,7 @@ input,select,textarea{font-family:var(--sans)}
   <button class="tab" onclick="showTab('chart',this)">Mileage Chart</button>
   <button class="tab" onclick="showTab('shoes',this)">Shoes</button>
   <button class="tab" onclick="showTab('strava',this)">Strava</button>
-  <button class="tab" onclick="showTab('pace',this)">Pace Calculator</button>
+  <button class="tab" onclick="showTab('pace',this)">Pace Calc</button>
 </div>
 
 <!-- ═══ TRAINING BLOCK ═══ -->
@@ -837,8 +837,9 @@ async function manualSync() {
   const btn = document.getElementById("sync-btn");
   btn.textContent = "⟳ Syncing…";
   btn.disabled = true;
-  const loaded = await loadSettingsFromSheet();
-  if (loaded) {
+  const [blocksLoaded, settingsLoaded] = await Promise.all([loadBlocksFromSheet(), loadSettingsFromSheet()]);
+  if (settingsLoaded || blocksLoaded) {
+    renderSidebar();
     updateGoalDisplay();
     renderBlock();
     renderShoes();
@@ -1805,6 +1806,15 @@ function toast(msg, type="ok") {
 // BOOT
 // ═══════════════════════════════════════════════════════════
 async function boot() {
+  // Load block registry from sheet first — this is what syncs across devices
+  await loadBlocksFromSheet();
+
+  // If the previously active block no longer exists in the synced list, fall back
+  if (!BLOCKS.find(b => b.id === activeBlockId)) {
+    activeBlockId = BLOCKS[0].id;
+    try { localStorage.setItem("pm_activeBlock", activeBlockId); } catch(e) {}
+  }
+
   initState();
   applyTheme(STATE.theme);
   updateGoalDisplay();
@@ -1975,6 +1985,43 @@ boot();
 
 function saveBlocks() {
   try { localStorage.setItem("pm_blocks", JSON.stringify(BLOCKS)); } catch(e) {}
+  // Also sync to sheet so other devices pick it up
+  fetch(SETTINGS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "savesettings", blockId: "__global__", key: "blocks", value: BLOCKS })
+  }).catch(e => console.warn("blocks sync failed:", e));
+}
+
+async function loadBlocksFromSheet() {
+  try {
+    const res  = await fetch(SETTINGS_URL + "?action=getsettings&blockId=__global__");
+    const data = await res.json();
+    if (data.error || !data.settings || !data.settings.blocks) return false;
+    const sheetBlocks = data.settings.blocks;
+    if (!Array.isArray(sheetBlocks) || !sheetBlocks.length) return false;
+    // Merge: sheet is source of truth for block list, but preserve any local-only blocks
+    // that haven't synced yet (by id)
+    const sheetIds = new Set(sheetBlocks.map(b => b.id));
+    const localOnly = BLOCKS.filter(b => !sheetIds.has(b.id));
+    BLOCKS = [...sheetBlocks, ...localOnly];
+    try { localStorage.setItem("pm_blocks", JSON.stringify(BLOCKS)); } catch(e) {}
+    // Restore last active block from sheet if not already set locally
+    if (data.settings.activeBlockId) {
+      const sheetActive = data.settings.activeBlockId;
+      const localActive = (() => { try { return localStorage.getItem("pm_activeBlock"); } catch(e) { return null; } })();
+      // Sheet wins if local has no preference or local block no longer exists
+      if (!localActive || !BLOCKS.find(b => b.id === localActive)) {
+        activeBlockId = sheetActive;
+        try { localStorage.setItem("pm_activeBlock", sheetActive); } catch(e) {}
+      }
+    }
+    console.log("Blocks loaded from sheet:", BLOCKS.length);
+    return true;
+  } catch(e) {
+    console.warn("Could not load blocks from sheet:", e);
+    return false;
+  }
 }
 
 function renderSidebar() {
@@ -2035,6 +2082,12 @@ async function switchBlock(id) {
   if (id === activeBlockId) { closeSidebar(); return; }
   activeBlockId = id;
   try { localStorage.setItem("pm_activeBlock", id); } catch(e) {}
+  // Sync active block preference to sheet so other devices follow
+  fetch(SETTINGS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "savesettings", blockId: "__global__", key: "activeBlockId", value: id })
+  }).catch(() => {});
   const block = BLOCKS.find(b => b.id === id);
   if (!block) return;
 
