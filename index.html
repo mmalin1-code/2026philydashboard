@@ -1990,18 +1990,27 @@ function saveBlocks() {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ action: "savesettings", blockId: "__global__", key: "blocks", value: BLOCKS })
-  }).catch(e => console.warn("blocks sync failed:", e));
+  })
+  .then(r => r.json())
+  .then(d => console.log("[saveBlocks] sheet response:", JSON.stringify(d)))
+  .catch(e => console.warn("[saveBlocks] POST failed:", e));
 }
 
 async function loadBlocksFromSheet() {
   try {
-    const res  = await fetch(SETTINGS_URL + "?action=getsettings&blockId=__global__");
-    const data = await res.json();
-    if (data.error || !data.settings || !data.settings.blocks) return false;
+    const url = SETTINGS_URL + "?action=getsettings&blockId=__global__";
+    console.log("[loadBlocks] fetching:", url);
+    const res  = await fetch(url);
+    const raw  = await res.text();
+    console.log("[loadBlocks] raw response:", raw.slice(0, 500));
+    let data;
+    try { data = JSON.parse(raw); } catch(e) { console.warn("[loadBlocks] JSON parse failed:", e); return false; }
+    if (data.error) { console.warn("[loadBlocks] sheet error:", data.error); return false; }
+    if (!data.settings) { console.warn("[loadBlocks] no settings key in response"); return false; }
+    if (!data.settings.blocks) { console.warn("[loadBlocks] no blocks key in settings — sheet may not have been written yet"); return false; }
     const sheetBlocks = data.settings.blocks;
-    if (!Array.isArray(sheetBlocks) || !sheetBlocks.length) return false;
-    // Merge: sheet is source of truth for block list, but preserve any local-only blocks
-    // that haven't synced yet (by id)
+    if (!Array.isArray(sheetBlocks) || !sheetBlocks.length) { console.warn("[loadBlocks] blocks is empty or not an array:", sheetBlocks); return false; }
+    // Merge: sheet is source of truth, but keep any local-only blocks not yet synced
     const sheetIds = new Set(sheetBlocks.map(b => b.id));
     const localOnly = BLOCKS.filter(b => !sheetIds.has(b.id));
     BLOCKS = [...sheetBlocks, ...localOnly];
@@ -2010,19 +2019,38 @@ async function loadBlocksFromSheet() {
     if (data.settings.activeBlockId) {
       const sheetActive = data.settings.activeBlockId;
       const localActive = (() => { try { return localStorage.getItem("pm_activeBlock"); } catch(e) { return null; } })();
-      // Sheet wins if local has no preference or local block no longer exists
       if (!localActive || !BLOCKS.find(b => b.id === localActive)) {
         activeBlockId = sheetActive;
         try { localStorage.setItem("pm_activeBlock", sheetActive); } catch(e) {}
       }
     }
-    console.log("Blocks loaded from sheet:", BLOCKS.length);
+    console.log("[loadBlocks] success — blocks:", BLOCKS.map(b => b.name));
     return true;
   } catch(e) {
-    console.warn("Could not load blocks from sheet:", e);
+    console.warn("[loadBlocks] exception:", e);
     return false;
   }
 }
+
+// ── Debug helper — run window.debugSync() in browser console ──────
+window.debugSync = async function() {
+  console.log("=== SYNC DEBUG ===");
+  console.log("SETTINGS_URL:", SETTINGS_URL);
+  console.log("Current BLOCKS (local):", JSON.stringify(BLOCKS));
+  console.log("activeBlockId (local):", activeBlockId);
+  try {
+    const res  = await fetch(SETTINGS_URL + "?action=getsettings&blockId=__global__");
+    const raw  = await res.text();
+    console.log("Raw sheet response for __global__:", raw);
+    const data = JSON.parse(raw);
+    console.log("Parsed:", data);
+  } catch(e) { console.error("Fetch failed:", e); }
+  try {
+    const res2 = await fetch(SETTINGS_URL + "?action=getallsettings");
+    const raw2 = await res2.text();
+    console.log("All settings:", raw2.slice(0,2000));
+  } catch(e) { console.error("getAllSettings failed:", e); }
+};
 
 function renderSidebar() {
   const list = document.getElementById("block-list");
