@@ -1450,7 +1450,7 @@ async function handleStravaRedirect() {
 
   setActsStatus("Connecting to Strava…");
   try {
-    const res = await fetch(APPS_SCRIPT_URL + "?action=stravaExchange&code=" + encodeURIComponent(code));
+    const res = await fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=stravaExchange&code=" + encodeURIComponent(code));
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     if (!data.access_token) throw new Error("No access token returned.");
@@ -1482,7 +1482,7 @@ async function getValidStravaToken() {
 
   // expired — refresh via Apps Script (keeps client secret server-side)
   try {
-    const res = await fetch(APPS_SCRIPT_URL + "?action=stravaRefresh&refresh_token=" + encodeURIComponent(tokens.refresh_token));
+    const res = await fetch((window._activeScriptUrl || APPS_SCRIPT_URL) + "?action=stravaRefresh&refresh_token=" + encodeURIComponent(tokens.refresh_token));
     const data = await res.json();
     if (data.error || !data.access_token) throw new Error(data.error || "Refresh failed");
 
@@ -1586,7 +1586,7 @@ function mapRunsToCalendar(runs) {
 async function syncRunToSheet(run) {
   try {
     const dist = parseFloat(fmtDist(run.distance || 0));
-    await fetch(APPS_SCRIPT_URL, {
+    await fetch(window._activeScriptUrl || APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({
