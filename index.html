@@ -718,11 +718,8 @@ function bsave(k,v){
 
 // Sync a single setting key/value to the Google Sheet Settings tab
 function syncSettingToSheet(key, value) {
-  fetch(SETTINGS_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({ action: "savesettings", blockId: activeBlockId, key, value })
-  }).catch(e => console.warn("Settings sync failed:", key, e));
+  _postToSheet(SETTINGS_URL, { action: "savesettings", blockId: activeBlockId, key, value })
+    .catch(e => console.warn("Settings sync failed:", key, e));
 }
 
 // Load all settings for the active block from the sheet and apply to STATE
@@ -1985,16 +1982,35 @@ boot();
 
 function saveBlocks() {
   try { localStorage.setItem("pm_blocks", JSON.stringify(BLOCKS)); } catch(e) {}
-  // Also sync to sheet so other devices pick it up
-  fetch(SETTINGS_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({ action: "savesettings", blockId: "__global__", key: "blocks", value: BLOCKS })
-  })
-  .then(r => r.json())
-  .then(d => console.log("[saveBlocks] sheet response:", JSON.stringify(d)))
-  .catch(e => console.warn("[saveBlocks] POST failed:", e));
+  _postToSheet(SETTINGS_URL, { action: "savesettings", blockId: "__global__", key: "blocks", value: BLOCKS })
+    .then(d => console.log("[saveBlocks] sheet response:", JSON.stringify(d)))
+    .catch(e => console.warn("[saveBlocks] POST failed:", e));
 }
+
+// Reliable POST — passes body through Apps Script redirects
+async function _postToSheet(url, payload) {
+  const body = JSON.stringify(payload);
+  const res = await fetch(url, {
+    method: "POST",
+    redirect: "follow",
+    headers: { "Content-Type": "text/plain" },
+    body
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch(e) { return { raw: text }; }
+}
+
+// Run window.seedBlocks() from browser console once to write __global__ to the sheet
+window.seedBlocks = async function() {
+  console.log("Seeding blocks to sheet:", BLOCKS.map(b => b.name));
+  const result = await _postToSheet(SETTINGS_URL, {
+    action: "savesettings", blockId: "__global__", key: "blocks", value: BLOCKS
+  });
+  console.log("Seed result:", result);
+  const check = await fetch(SETTINGS_URL + "?action=getsettings&blockId=__global__");
+  const data  = await check.json();
+  console.log("Verification:", JSON.stringify(data).slice(0, 500));
+};
 
 async function loadBlocksFromSheet() {
   try {
