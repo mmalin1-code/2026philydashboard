@@ -1542,9 +1542,20 @@ async function loadActivities() {
  * shows actual miles in place of the planned number.
  */
 function mapRunsToCalendar(runs) {
+  // Only map runs that fall within the active block's date range
+  const activeBlock = BLOCKS.find(b => b.id === activeBlockId);
+  const blockStart = activeBlock && activeBlock.startDate ? new Date(activeBlock.startDate + "T00:00:00") : null;
+  const blockEnd   = activeBlock ? new Date((activeBlock.endDate || activeBlock.raceDate) + "T23:59:59") : null;
+
+  const blockRuns = runs.filter(r => {
+    if (!blockStart || !blockEnd) return true; // no date range set, allow all
+    const dt = new Date(r.start_date_local || r.start_date);
+    return dt >= blockStart && dt <= blockEnd;
+  });
+
   // group runs by local calendar date (YYYY-MM-DD)
   const byDate = {};
-  runs.forEach(r => {
+  blockRuns.forEach(r => {
     const dt = new Date(r.start_date_local || r.start_date);
     const key = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
     if (!byDate[key]) byDate[key] = [];
@@ -1729,7 +1740,8 @@ function computePredictions(runs) {
   // Strategy: pick the best VDOT-like effort — fastest pace among runs
   // that are at least 3 miles long, so warmups/cooldowns/intervals don't
   // skew the prediction. Fall back to 1.5 miles if nothing longer exists.
-  const blockStart = new Date("2026-06-22T00:00:00");
+  const activeBlock = BLOCKS.find(b => b.id === activeBlockId);
+  const blockStart = activeBlock && activeBlock.startDate ? new Date(activeBlock.startDate + "T00:00:00") : new Date("2026-06-22T00:00:00");
   const MIN_DIST_METERS = 4828; // 3 miles
   const FALLBACK_DIST   = 2414; // 1.5 miles
 
