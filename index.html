@@ -738,6 +738,7 @@ async function loadSettingsFromSheet() {
     if (s.phases)       { STATE.phases       = s.phases;       save(activeBlockId+"_phases",       STATE.phases); }
     if (s.shoes)        { STATE.shoes        = s.shoes;        save("shoes",                       STATE.shoes); }
     if (s.runTypes)     { STATE.runTypes     = s.runTypes;     save("runTypes",                    STATE.runTypes); }
+    if (s.actEdits)     { STATE.actEdits     = s.actEdits;     save(activeBlockId+"_actEdits",     STATE.actEdits); }
 
     console.log("Settings loaded from sheet for", activeBlockId);
     return true;
