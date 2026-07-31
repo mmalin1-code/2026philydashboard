@@ -2004,7 +2004,7 @@ function calcPaceZones() {
   // Zone paces (sec/mile)
   const zones = [
     { name:"Easy",             pct1:0.59, pct2:0.65, color:"var(--gr)",  desc:"Daily easy / long run base" },
-    { name:"Marathon Pace",    pct1:0.83, pct2:0.83, color:"var(--bl)",  desc:"Goal race effort" },
+    { name:"Marathon Pace",    pct1:0.82, pct2:0.82, color:"var(--bl)",  desc:"Goal race effort" },
     { name:"Threshold (LT)",   pct1:0.88, pct2:0.88, color:"var(--am)",  desc:"Tempo / cruise intervals" },
     { name:"Interval (VO₂)",   pct1:0.98, pct2:0.98, color:"var(--pu)",  desc:"800m–1600m repeats" },
     { name:"Repetition",       pct1:1.05, pct2:1.05, color:"var(--rd)",  desc:"200–400m speed work" },
@@ -2023,7 +2023,7 @@ function calcPaceZones() {
   }).join("");
 
   // MP splits
-  const mpSec = _pcSecPerMile(0.83 * vdot);
+  const mpSec = _pcSecPerMile(0.82 * vdot);
   const splits = [
     { label:"1 Mile",        mi:1 },
     { label:"5K",            mi:3.10686 },
