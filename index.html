@@ -347,6 +347,8 @@ input,select,textarea{font-family:var(--sans)}
   <button class="tab" onclick="showTab('strava',this)">Strava</button>
   <button class="tab" onclick="showTab('fitness',this)">Fitness</button>
   <button class="tab" onclick="showTab('pace',this)">Pace Calc</button>
+  <button class="tab" onclick="showTab('raceinfo',this)">Race Info</button>
+  <button class="tab" onclick="showTab('paceband',this)">Pace Band</button>
 </div>
 
 <!-- ═══ TRAINING BLOCK ═══ -->
@@ -550,6 +552,117 @@ input,select,textarea{font-family:var(--sans)}
 
   </div>
 </div><!-- end pane-pace -->
+
+<!-- ═══ RACE INFO ═══ -->
+<div class="pane" id="pane-raceinfo">
+  <div style="max-width:820px">
+
+    <!-- Header -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <div style="font-size:2rem">🦅</div>
+        <div>
+          <div style="font-size:1.2rem;font-weight:800">TIAA Philadelphia Marathon</div>
+          <div style="font-size:13px;color:var(--mut)">November 22, 2026 · 7:00 AM · Benjamin Franklin Parkway</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+        ${[
+          {l:"Distance",v:"26.2 mi"},
+          {l:"Start Time",v:"7:00 AM"},
+          {l:"Avg High Temp",v:"51°F"},
+          {l:"Avg Low Temp",v:"34°F"},
+          {l:"Elevation Gain",v:"~185 ft"},
+          {l:"Course Type",v:"Mostly Loop"},
+          {l:"BQ Qualifier",v:"✓ Yes"},
+          {l:"Surface",v:"Road"},
+        ].map(x=>`<div style="background:var(--sur2);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${x.l}</div>
+          <div style="font-size:.95rem;font-weight:700">${x.v}</div>
+        </div>`).join("")}
+      </div>
+    </div>
+
+    <!-- Elevation Profile -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Elevation Profile</div>
+      <canvas id="ri-elev-chart" style="width:100%;height:160px"></canvas>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--mut);flex-wrap:wrap">
+        <span>🔵 Water station</span>
+        <span>🟠 Race gel available</span>
+        <span>⚠️ Notable hill</span>
+      </div>
+    </div>
+
+    <!-- Course breakdown -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Course Breakdown</div>
+      <div style="display:flex;flex-direction:column;gap:10px" id="ri-segments"></div>
+    </div>
+
+    <!-- Water stations -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Aid Stations</div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">Water + Nuun at every station · Race gels (e-Gel) available past mi 11, before mi 18, and past mi 22</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px" id="ri-stations"></div>
+    </div>
+
+    <!-- Race tips -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Race Day Tips</div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="ri-tips"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ PACE BAND ═══ -->
+<div class="pane" id="pane-paceband">
+  <div style="max-width:700px">
+
+    <!-- Settings -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:14px">Pace Band Settings</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:5px">Goal Time</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" id="pb-h" min="2" max="6" value="2" style="width:48px;padding:7px 4px;text-align:center;background:var(--sur2);border:1.5px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:1rem;font-weight:700" oninput="renderPaceBand()">
+            <span style="color:var(--mut);font-weight:700">:</span>
+            <input type="number" id="pb-m" min="0" max="59" value="49" style="width:48px;padding:7px 4px;text-align:center;background:var(--sur2);border:1.5px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:1rem;font-weight:700" oninput="renderPaceBand()">
+            <span style="color:var(--mut);font-weight:700">:</span>
+            <input type="number" id="pb-s" min="0" max="59" value="59" style="width:48px;padding:7px 4px;text-align:center;background:var(--sur2);border:1.5px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:1rem;font-weight:700" oninput="renderPaceBand()">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:5px">Strategy</div>
+          <select id="pb-strategy" style="width:100%;padding:8px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:13px" onchange="renderPaceBand()">
+            <option value="even">Even splits</option>
+            <option value="neg">Negative split (faster 2nd half)</option>
+            <option value="pos">Positive split (conservative start)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:8px">Gel Plan — click miles to mark a gel 💊</div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:4px">Race gels on course: <span style="color:var(--acc)">~mi 11, ~mi 18, ~mi 22</span> (with water) — great times to take a gel without carrying</div>
+      </div>
+    </div>
+
+    <!-- Pace band table -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)">Mile-by-Mile Splits</div>
+        <button class="btn btn-sm btn-acc" onclick="printPaceBand()">🖨 Print</button>
+      </div>
+      <div id="pb-table"></div>
+    </div>
+
+    <!-- Summary -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px" id="pb-summary"></div>
+
+  </div>
+</div>
 
 </div><!-- end .app -->
 
@@ -2051,10 +2164,12 @@ function showTab(id, btn) {
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
   document.getElementById("pane-"+id).classList.add("on");
   btn.classList.add("on");
-  if (id==="shoes")   renderShoes();
-  if (id==="chart")   renderChart();
-  if (id==="pace")    { pcLoadGoal(); runCv1(); runCv2(); }
-  if (id==="fitness") renderFitness();
+  if (id==="shoes")    renderShoes();
+  if (id==="chart")    renderChart();
+  if (id==="pace")     { pcLoadGoal(); runCv1(); runCv2(); }
+  if (id==="fitness")  renderFitness();
+  if (id==="raceinfo") renderRaceInfo();
+  if (id==="paceband") { renderPaceBand(); }
 }
 function openModal(id) { document.getElementById(id).classList.add("open"); }
 function closeModal(id) { document.getElementById(id).classList.remove("open"); }
@@ -2238,6 +2353,269 @@ function runCv2() {
   const totalSec = h * 3600 + m * 60 + s;
   if (!totalSec || !dist) { document.getElementById("cv2-result").textContent = "—"; return; }
   document.getElementById("cv2-result").textContent = _pcFmt(totalSec / dist) + " /mi";
+}
+
+// ═══════════════════════════════════════════════════════════
+// RACE INFO
+// ═══════════════════════════════════════════════════════════
+const PHILLY_STATIONS = [
+  {mi:2.8,  loc:"Columbus Blvd & Race St",     gel:false},
+  {mi:3.7,  loc:"Front St & Washington Ave",   gel:false},
+  {mi:5.1,  loc:"6th & Walnut Streets",        gel:false},
+  {mi:7.1,  loc:"31st & Walnut Streets",       gel:false},
+  {mi:8.5,  loc:"34th St & Fairmount Ave",     gel:false},
+  {mi:10.2, loc:"Ave of Republic @ Carousel",  gel:false},
+  {mi:11.8, loc:"Lansdowne Dr @ Sweetbriar",   gel:true},
+  {mi:14.4, loc:"Edgley Dr @ Power Corps",     gel:false},
+  {mi:15.8, loc:"Kelly Dr & Fountain Green",   gel:false},
+  {mi:17.8, loc:"Kelly Dr & Ferry St",         gel:true},
+  {mi:18.9, loc:"Main St & Ridge Ave",         gel:true},
+  {mi:19.8, loc:"Main & Cotton (Winnie's)",    gel:false},
+  {mi:20.2, loc:"Main & Cotton (return)",      gel:false},
+  {mi:21.3, loc:"Main St & Ridge Ave (return)",gel:false},
+  {mi:22.3, loc:"Kelly Dr & Ferry St (return)",gel:true},
+  {mi:24.8, loc:"Kelly Dr & Fountain Green (ret)",gel:false},
+];
+
+// Approximate elevation by mile (ft) based on official profile
+const PHILLY_ELEV = [
+  20,18,15,18,22,28,55,90,110,95,
+  75,85,95,80,55,40,45,50,55,52,
+  50,48,45,42,35,30,20
+];
+
+const PHILLY_SEGMENTS = [
+  {miles:"0–6",   name:"Downtown & Old City",    desc:"Flat start. City Hall, Independence Hall, Penn's Landing. High crowd energy — run controlled.", icon:"🏙️", warn:false},
+  {miles:"6–10",  name:"University City",         desc:"Gentle rolling. Stay relaxed through West Philly neighborhoods.", icon:"🏫", warn:false},
+  {miles:"10–13", name:"Fairmount Park Hills",    desc:"The toughest climbing. Two notable hills at mi 7 and mi 9 (if not accounted above). Run effort, not pace here.", icon:"⛰️", warn:true},
+  {miles:"13–16", name:"Park Loop",               desc:"Rolling through the park. Hit the half in 1:24:59 for a perfect negative split.", icon:"🌳", warn:false},
+  {miles:"16–21", name:"Manayunk Out & Back",     desc:"Electric crowd in Manayunk around mi 19–20. Loud and energizing — biggest cheer section.", icon:"🎉", warn:false},
+  {miles:"21–26.2",name:"Kelly Drive Home",       desc:"Out-and-back on the river. Can feel exposed and lonely. Rolling hills. Break it into 1-mile chunks. Finish on the Parkway — Rocky steps in sight.", icon:"🏃", warn:true},
+];
+
+function renderRaceInfo() {
+  // Elevation chart
+  const canvas = document.getElementById("ri-elev-chart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.parentElement.clientWidth - 32;
+  const H   = 160;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  canvas.style.width = W+"px"; canvas.style.height = H+"px";
+  ctx.scale(dpr,dpr);
+
+  const PAD = {t:10,r:10,b:28,l:38};
+  const cW  = W-PAD.l-PAD.r, cH = H-PAD.t-PAD.b;
+  const minE = 0, maxE = 130;
+  const isDark = document.body.classList.contains("dark") || window.matchMedia("(prefers-color-scheme:dark)").matches;
+  const mutC = isDark?"rgba(255,255,255,0.2)":"rgba(0,0,0,0.12)";
+  const txtC = isDark?"rgba(255,255,255,0.45)":"rgba(0,0,0,0.4)";
+
+  function ex(i){ return PAD.l + (i/(PHILLY_ELEV.length-1))*cW; }
+  function ey(e){ return PAD.t + cH - ((e-minE)/(maxE-minE))*cH; }
+
+  // Grid
+  ctx.strokeStyle=mutC; ctx.lineWidth=1;
+  [0,50,100].forEach(e=>{
+    const y=ey(e);
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cW,y); ctx.stroke();
+    ctx.fillStyle=txtC; ctx.font="9px sans-serif"; ctx.textAlign="right";
+    ctx.fillText(e+"ft", PAD.l-4, y+3);
+  });
+
+  // X labels (every 5 miles)
+  ctx.textAlign="center"; ctx.fillStyle=txtC; ctx.font="9px sans-serif";
+  [0,5,10,15,20,25,26].forEach(m=>{
+    const i = Math.min(m, PHILLY_ELEV.length-1);
+    ctx.fillText("mi "+m, ex(i), H-PAD.b+12);
+  });
+
+  // Fill under elevation
+  ctx.beginPath();
+  PHILLY_ELEV.forEach((e,i)=>{ i===0?ctx.moveTo(ex(i),ey(e)):ctx.lineTo(ex(i),ey(e)); });
+  ctx.lineTo(ex(PHILLY_ELEV.length-1), ey(0));
+  ctx.lineTo(ex(0), ey(0));
+  ctx.closePath();
+  ctx.fillStyle = isDark?"rgba(255,107,53,0.15)":"rgba(255,107,53,0.1)";
+  ctx.fill();
+
+  // Elevation line
+  ctx.beginPath(); ctx.strokeStyle="#FF6B35"; ctx.lineWidth=2;
+  PHILLY_ELEV.forEach((e,i)=>{ i===0?ctx.moveTo(ex(i),ey(e)):ctx.lineTo(ex(i),ey(e)); });
+  ctx.stroke();
+
+  // Water station dots
+  PHILLY_STATIONS.forEach(st=>{
+    const mi  = st.mi;
+    const idx = Math.round(mi);
+    const e   = PHILLY_ELEV[Math.min(idx, PHILLY_ELEV.length-1)];
+    const x   = PAD.l + (mi/26.2)*cW;
+    const y   = ey(e);
+    ctx.beginPath(); ctx.arc(x,y-8,4,0,Math.PI*2);
+    ctx.fillStyle = st.gel ? "#FF6B35" : "#4d9eff";
+    ctx.fill();
+  });
+
+  // Segments list
+  document.getElementById("ri-segments").innerHTML = PHILLY_SEGMENTS.map(s=>`
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--sur2);border-radius:var(--r);${s.warn?"border-left:3px solid var(--am)":""}">
+      <div style="font-size:1.3rem;line-height:1">${s.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700;margin-bottom:2px">Mi ${s.miles} — ${s.name}</div>
+        <div style="font-size:12px;color:var(--mut)">${s.desc}</div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--mut);white-space:nowrap">${s.miles}</div>
+    </div>`).join("");
+
+  // Aid stations grid
+  document.getElementById("ri-stations").innerHTML = PHILLY_STATIONS.map(s=>`
+    <div style="background:var(--sur2);border-radius:var(--r);padding:8px 10px;display:flex;align-items:center;gap:8px;${s.gel?"border:1px solid var(--am)":""}">
+      <span style="font-size:14px">${s.gel?"🟠":"🔵"}</span>
+      <div>
+        <div style="font-size:11px;font-weight:700">Mi ${s.mi}</div>
+        <div style="font-size:10px;color:var(--mut)">${s.loc}</div>
+        ${s.gel?`<div style="font-size:10px;color:var(--am);font-weight:600">+ Race gel</div>`:""}
+      </div>
+    </div>`).join("");
+
+  // Tips
+  const tips = [
+    {icon:"🚀", tip:"Miles 0–3 will feel easy — resist the urge. The crowd energy at the start is electric. Lock in at goal pace and let the race come to you."},
+    {icon:"⛰️", tip:"Miles 7–12 have the course's biggest hills. Run by effort here, not pace. A few extra seconds per mile on the hills saves you on the back half."},
+    {icon:"💧", tip:"Don't skip the first water stop at mi 2.8. You may not feel thirsty but staying ahead of hydration is critical."},
+    {icon:"💊", tip:"Take your first gel by mile 6–7 regardless of how you feel. The course offers gels at ~mi 11, 18, and 22 — plan around those for free fuel."},
+    {icon:"🎉", tip:"Manayunk (mi 19–21) is the loudest section. Let the crowd carry you but don't surge — you'll need that energy for Kelly Drive."},
+    {icon:"🌬️", tip:"Kelly Drive (mi 21–25) can be exposed and windy. Stay low, focus on form, and run mile-by-mile. You're almost there."},
+    {icon:"🏁", tip:"The final stretch on the Parkway is slightly downhill. If you have anything left, go. The Rocky steps are right there — earn it."},
+  ];
+  document.getElementById("ri-tips").innerHTML = tips.map(t=>`
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <span style="font-size:1.1rem">${t.icon}</span>
+      <div style="font-size:13px;color:var(--txt);line-height:1.5">${t.tip}</div>
+    </div>`).join("");
+}
+
+// ═══════════════════════════════════════════════════════════
+// PACE BAND
+// ═══════════════════════════════════════════════════════════
+let pbGels = new Set([6, 11, 18, 22]); // default gel miles
+
+function renderPaceBand() {
+  const h   = parseInt(document.getElementById("pb-h").value)||2;
+  const m   = parseInt(document.getElementById("pb-m").value)||49;
+  const s   = parseInt(document.getElementById("pb-s").value)||59;
+  const totalSec = h*3600 + m*60 + s;
+  const strat = document.getElementById("pb-strategy").value;
+
+  // Base pace per mile
+  const basePace = totalSec / 26.2188;
+
+  // Strategy multipliers per mile (even/neg/pos)
+  function paceForMile(mi) {
+    if (strat === "even") return basePace;
+    if (strat === "neg") {
+      // Start 2% slower, finish 2% faster, smooth transition
+      const t = (mi-1) / 25.2;
+      return basePace * (1.02 - 0.04*t);
+    }
+    if (strat === "pos") {
+      // Start 1.5% faster, fade slightly
+      const t = (mi-1) / 25.2;
+      return basePace * (0.985 + 0.03*t);
+    }
+    return basePace;
+  }
+
+  // Elevation adjustment: +1.5 sec per 10ft gain, -0.8 sec per 10ft drop
+  function elevAdj(mi) {
+    const i   = Math.min(mi, PHILLY_ELEV.length-2);
+    const gain = Math.max(0, PHILLY_ELEV[i] - PHILLY_ELEV[i-1] || 0);
+    const drop = Math.max(0, (PHILLY_ELEV[i-1]||0) - PHILLY_ELEV[i] || 0);
+    return (gain * 0.15) - (drop * 0.08);
+  }
+
+  function fmt(sec){ const mn=Math.floor(sec/60),sc=Math.round(sec%60); return mn+":"+String(sc).padStart(2,"0"); }
+  function fmtHMS(sec){ sec=Math.round(sec); return Math.floor(sec/3600)+":"+String(Math.floor((sec%3600)/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0"); }
+
+  // Build rows
+  let elapsed = 0;
+  const rows = [];
+  for (let mi=1; mi<=26; mi++) {
+    const pace = paceForMile(mi) + elevAdj(mi);
+    elapsed += pace;
+    const station = PHILLY_STATIONS.find(st => Math.abs(st.mi - mi) < 0.6);
+    rows.push({ mi, pace, elapsed, station, gel: pbGels.has(mi) });
+  }
+  // Mile 26.2
+  const lastPace = paceForMile(26) + elevAdj(26);
+  elapsed += lastPace * 0.2188;
+  rows.push({ mi:"26.2", pace: lastPace, elapsed, station: null, gel: false, finish: true });
+
+  // Phase labels
+  function phase(mi) {
+    if (mi <= 6)   return {label:"Downtown",     color:"#4d9eff"};
+    if (mi <= 13)  return {label:"Park Hills",   color:"#f59e0b"};
+    if (mi <= 16)  return {label:"Park Loop",    color:"#22c55e"};
+    if (mi <= 21)  return {label:"Manayunk",     color:"#a855f7"};
+    return                {label:"Kelly Dr",     color:"#FF6B35"};
+  }
+
+  document.getElementById("pb-table").innerHTML =
+    `<div style="display:grid;grid-template-columns:36px 1fr 68px 72px 20px 20px;gap:3px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--bdr)">
+      <span>Mi</span><span>Section</span><span>Split</span><span>Elapsed</span><span>💧</span><span>💊</span>
+    </div>` +
+    rows.map(r => {
+      const p    = phase(r.mi);
+      const isH  = r.mi == 13 || r.mi == "26.2";
+      return `<div style="display:grid;grid-template-columns:36px 1fr 68px 72px 20px 20px;gap:3px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bdr);${isH?"font-weight:700;background:rgba(77,158,255,0.07);border-radius:4px;padding:5px 4px":""}${r.finish?"font-weight:800;font-size:13px":""}">
+        <span style="font-family:var(--mono);font-weight:700">${r.mi}</span>
+        <span style="font-size:11px;color:${p.color};font-weight:600">${p.label}</span>
+        <span style="font-family:var(--mono)">${fmt(r.pace)}</span>
+        <span style="font-family:var(--mono);color:var(--mut)">${fmtHMS(r.elapsed)}</span>
+        <span title="${r.station?r.station.loc:""}">${r.station?"💧":""}</span>
+        <span onclick="toggleGel(${r.mi})" style="cursor:pointer;user-select:none" title="Click to toggle gel at this mile">${r.gel?"💊":"<span style='opacity:.2'>·</span>"}</span>
+      </div>`;
+    }).join("");
+
+  // Summary
+  const halfIdx = rows.findIndex(r=>r.mi===13);
+  const halfSec = rows[halfIdx]?.elapsed || 0;
+  const finishSec = rows[rows.length-1].elapsed;
+  document.getElementById("pb-summary").innerHTML = `
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+      ${[
+        {l:"Half Split",   v:fmtHMS(halfSec)},
+        {l:"Finish Time",  v:fmtHMS(finishSec)},
+        {l:"Avg Pace",     v:fmt(totalSec/26.2188)+"/mi"},
+        {l:"Gels Planned", v:pbGels.size+" total"},
+      ].map(x=>`<div style="background:var(--sur2);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${x.l}</div>
+        <div style="font-size:1rem;font-weight:800;font-family:var(--mono)">${x.v}</div>
+      </div>`).join("")}
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--mut)">
+      Gel schedule: ${[...pbGels].sort((a,b)=>a-b).map(m=>`Mi ${m}`).join(" · ") || "None planned"}
+    </div>`;
+}
+
+function toggleGel(mi) {
+  if (pbGels.has(mi)) pbGels.delete(mi);
+  else pbGels.add(mi);
+  renderPaceBand();
+}
+
+function printPaceBand() {
+  const w = window.open("","_blank");
+  const rows = document.getElementById("pb-table").innerHTML;
+  const sum  = document.getElementById("pb-summary").innerHTML;
+  w.document.write(`<html><head><title>Philly Pace Band</title>
+    <style>body{font-family:monospace;font-size:12px;padding:16px;max-width:500px}
+    h2{font-size:14px;margin-bottom:8px}</style></head>
+    <body><h2>Philadelphia Marathon — Pace Band</h2>${rows}<br>${sum}
+    <script>window.print()<\/script></body></html>`);
+  w.document.close();
 }
 
 boot();
