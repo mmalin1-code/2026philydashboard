@@ -347,8 +347,8 @@ input,select,textarea{font-family:var(--sans)}
   <button class="tab" onclick="showTab('strava',this)">Strava</button>
   <button class="tab" onclick="showTab('fitness',this)">Fitness</button>
   <button class="tab" onclick="showTab('pace',this)">Pace Calc</button>
-  <button class="tab" onclick="showTab('raceinfo',this)">Race Info</button>
   <button class="tab" onclick="showTab('paceband',this)">Pace Band</button>
+  <button class="tab" onclick="showTab('raceinfo',this)">Race Info</button>
 </div>
 
 <!-- ═══ TRAINING BLOCK ═══ -->
@@ -469,6 +469,34 @@ input,select,textarea{font-family:var(--sans)}
     <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px">
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:12px">Qualifying Runs Used</div>
       <div id="fit-run-table" style="font-size:12px"></div>
+    </div>
+
+    <!-- AI Coach Chat -->
+    <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)">AI Coach</div>
+        <div style="font-size:10px;background:var(--acc);color:#fff;padding:2px 7px;border-radius:20px;font-weight:600">BETA</div>
+      </div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Ask about your fitness, race predictions, training load, or get advice based on your actual Strava data.</div>
+
+      <!-- Suggested prompts -->
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="ai-suggestions">
+        <button class="btn btn-sm" onclick="aiPrompt('Based on my recent runs, what marathon time do you predict and why?')">Predict my marathon time</button>
+        <button class="btn btn-sm" onclick="aiPrompt('Am I building fitness or showing signs of fatigue based on my recent training?')">Fitness or fatigue?</button>
+        <button class="btn btn-sm" onclick="aiPrompt('What paces should I be hitting in workouts to break 2:49:59 at Philly?')">Workout targets</button>
+        <button class="btn btn-sm" onclick="aiPrompt('How is my long run progression looking and what should my next long run target be?')">Long run advice</button>
+      </div>
+
+      <!-- Chat messages -->
+      <div id="ai-chat-msgs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;max-height:420px;overflow-y:auto"></div>
+
+      <!-- Input -->
+      <div style="display:flex;gap:8px">
+        <textarea id="ai-chat-input" placeholder="Ask your AI coach anything about your training…"
+          style="flex:1;padding:10px;background:var(--sur2);border:1.5px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:13px;resize:none;height:60px;line-height:1.5"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiChat();}"></textarea>
+        <button class="btn btn-acc" onclick="sendAiChat()" style="align-self:flex-end;padding:10px 16px" id="ai-send-btn">Send</button>
+      </div>
     </div>
 
   </div>
@@ -2616,6 +2644,141 @@ function printPaceBand() {
     <body><h2>Philadelphia Marathon — Pace Band</h2>${rows}<br>${sum}
     <script>window.print()<\/script></body></html>`);
   w.document.close();
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI COACH CHAT
+// ═══════════════════════════════════════════════════════════
+let aiChatHistory = [];
+
+function buildRunContext() {
+  const pool    = window._fitPool || [];
+  const avgSec  = window._fitAvgSec;
+  const goalSec = window._fitGoalSec;
+  const activeBlock = BLOCKS.find(b => b.id === activeBlockId);
+
+  function fmt(s){ const m=Math.floor(s/60),sc=Math.round(s%60); return m+":"+String(sc).padStart(2,"0"); }
+  function fmtHMS(s){ s=Math.round(s); return Math.floor(s/3600)+":"+String(Math.floor((s%3600)/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+
+  const recentRuns = pool.slice(-15).map(p => {
+    const edit = STATE.actEdits[p.run.id] || {};
+    const name = edit.name || p.run.name;
+    const date = p.date.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    return `- ${date}: "${name}" — ${p.distMi.toFixed(1)}mi @ ${p.pace}/mi (predicted marathon: ${fmtHMS(p.marathonSec)})`;
+  }).join("\n");
+
+  const weeklyMiles = (() => {
+    if (!WEEKS || !WEEKS.length) return "Not available";
+    return WEEKS.slice(-8).map(w => {
+      const actual = Object.values(STATE.dayOverrides || {})
+        .filter(d => d.fromStrava)
+        .reduce((s, d) => s + (d.actualMiles||0), 0);
+      return `Wk ${w.n}: ${w.mpw || "?"} planned`;
+    }).join(", ");
+  })();
+
+  return `You are an expert marathon coach AI analyzing a runner's training data. Be specific, data-driven, and encouraging. Reference actual numbers from their data.
+
+ATHLETE PROFILE:
+- Goal: Philadelphia Marathon, November 22, 2026
+- Goal time: ${activeBlock?.goal || "2:49:59"} (6:29/mi)
+- PR: 2:57:03 (Mesa, February 2026)
+- Current block start: ${activeBlock?.startDate || "2026-06-22"}
+- Club: Dogtown Running Club + BR Racing Team
+- VDOT: ~${window._fitPool ? "57-58" : "unknown"}
+
+RECENT STRAVA RUNS (last 15 qualifying runs, 3mi+):
+${recentRuns || "No runs loaded yet — user needs to refresh Strava tab first."}
+
+AGGREGATED PREDICTION:
+${avgSec ? `Current predicted marathon: ${fmtHMS(avgSec)} (avg of best 5 Riegel predictions)` : "Not yet calculated"}
+${goalSec && avgSec ? `Delta vs goal: ${avgSec > goalSec ? "+" : ""}${fmtHMS(Math.abs(avgSec-goalSec))} ${avgSec <= goalSec ? "(ahead of goal 🎯)" : "(behind goal)"}` : ""}
+
+TREND: ${pool.length >= 2 ? `${pool.length} qualifying runs analyzed. Earliest prediction: ${fmtHMS(pool[0]?.marathonSec)}, Most recent: ${fmtHMS(pool[pool.length-1]?.marathonSec)}` : "Not enough data yet"}
+
+SHOE ROTATION:
+- Easy: Nike Peg 42, NB 1080 V15
+- Workouts: NB Rebel V5
+- Long runs: ASICS Superblast 3
+- Race: Vaporfly 3.2 or HOKA Rocket X3
+
+Answer the athlete's question using their actual data above. Be concise, specific, and actionable. Use their real split numbers and predicted times when relevant.`;
+}
+
+function aiMsgEl(role, text, isLoading) {
+  const el = document.createElement("div");
+  el.style.cssText = `display:flex;gap:10px;align-items:flex-start;${role==="user"?"flex-direction:row-reverse":""}`;
+  el.innerHTML = `
+    <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;
+      ${role==="user"?"background:var(--acc);color:#fff":"background:var(--sur2);border:1px solid var(--bdr)"}">
+      ${role==="user"?"M":"🏃"}
+    </div>
+    <div style="max-width:85%;padding:10px 13px;border-radius:${role==="user"?"12px 2px 12px 12px":"2px 12px 12px 12px"};
+      background:${role==="user"?"var(--acc)":"var(--sur2)"};
+      color:${role==="user"?"#fff":"var(--txt)"};
+      font-size:13px;line-height:1.55;border:${role==="user"?"none":"1px solid var(--bdr)"}" id="${isLoading?"ai-loading-bubble":""}">
+      ${isLoading ? '<span style="opacity:.6">Analyzing your training data…</span>' : text.replace(/\n/g,"<br>")}
+    </div>`;
+  return el;
+}
+
+async function sendAiChat() {
+  const input = document.getElementById("ai-chat-input");
+  const msgs  = document.getElementById("ai-chat-msgs");
+  const btn   = document.getElementById("ai-send-btn");
+  const text  = input.value.trim();
+  if (!text) return;
+
+  // Add user message
+  msgs.appendChild(aiMsgEl("user", text));
+  aiChatHistory.push({ role:"user", content: text });
+  input.value = "";
+  btn.disabled = true;
+  btn.textContent = "…";
+
+  // Loading bubble
+  const loadingEl = aiMsgEl("assistant", "", true);
+  msgs.appendChild(loadingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const systemPrompt = buildRunContext();
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: aiChatHistory
+      })
+    });
+
+    const data   = await response.json();
+    const reply  = data.content?.[0]?.text || "Sorry, I couldn't generate a response. Try again.";
+
+    // Remove loading, add real reply
+    loadingEl.remove();
+    msgs.appendChild(aiMsgEl("assistant", reply));
+    aiChatHistory.push({ role:"assistant", content: reply });
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // Trim history to last 10 exchanges to avoid token bloat
+    if (aiChatHistory.length > 20) aiChatHistory = aiChatHistory.slice(-20);
+
+  } catch(e) {
+    loadingEl.remove();
+    msgs.appendChild(aiMsgEl("assistant", "Error connecting to AI — check your connection and try again."));
+    console.error("AI chat error:", e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Send";
+}
+
+function aiPrompt(text) {
+  document.getElementById("ai-chat-input").value = text;
+  sendAiChat();
 }
 
 boot();
