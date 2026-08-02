@@ -826,12 +826,6 @@ input,select,textarea{font-family:var(--sans)}
       <label>Shoe</label>
       <select id="act-shoe-inp"></select>
     </div>
-    <div class="form-row" id="split-shoe-row">
-      <label>Split shoes <span style="font-size:10px;color:var(--mut);font-weight:400">(optional — for WU/CD in different shoes)</span></label>
-      <div id="split-shoe-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
-      <button class="btn btn-sm" onclick="addSplitRow()" id="add-split-btn" style="font-size:11px">+ Add segment</button>
-      <div id="split-miles-warn" style="font-size:11px;color:var(--rd);margin-top:4px;display:none"></div>
-    </div>
     <div class="form-row">
       <label>Notes</label>
       <textarea id="act-notes-inp"></textarea>
@@ -1836,15 +1830,6 @@ function renderActivities(runs) {
         ${run.average_heartrate?`<span>♥ ${Math.round(run.average_heartrate)} bpm</span>`:""}
       </div>
       <select class="act-shoe-sel" data-i="${i}" onchange="assignShoe(${i},this.value)">${shoeOptions(shoe)}</select>
-      ${edit.shoeSplit && edit.shoeSplit.length ? (() => {
-        const splitTotal = edit.shoeSplit.reduce((s,x)=>s+x.miles,0);
-        const mainMiles  = parseFloat((parseFloat(fmtDist(run.distance||0)) - splitTotal).toFixed(2));
-        const mainShoe   = STATE.shoes.find(x=>x.id===shoe);
-        const parts = [];
-        if (mainMiles > 0 && shoe) parts.push(`${mainMiles}mi in ${mainShoe?mainShoe.name:shoe}`);
-        edit.shoeSplit.forEach(s=>{const sn=STATE.shoes.find(x=>x.id===s.shoe);parts.push(`${s.miles}mi in ${sn?sn.name:s.shoe}`);});
-        return `<div style="font-size:11px;color:var(--mut);margin-top:-4px;margin-bottom:6px">${parts.join(" · ")}</div>`;
-      })() : ""}
       ${run.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:8px;font-style:italic">"${run.description}"</div>`:""}`;
     list.appendChild(c);
   });
@@ -1866,48 +1851,7 @@ function openActEdit(i) {
   document.getElementById("act-type-inp").innerHTML = runTypeOptions(edit.type||"");
   document.getElementById("act-shoe-inp").innerHTML = shoeOptions(edit.shoe||"");
 
-  // Populate split shoe rows
-  const splitList = document.getElementById("split-shoe-list");
-  splitList.innerHTML = "";
-  window._editingRunDist = parseFloat(fmtDist(run.distance||0));
-  if (edit.shoeSplit && edit.shoeSplit.length) {
-    edit.shoeSplit.forEach(seg => addSplitRow(seg.shoe, seg.miles));
-  }
-  document.getElementById("add-split-btn").style.display = "";
   openModal("modal-act");
-}
-
-function addSplitRow(shoeId, miles) {
-  const list = document.getElementById("split-shoe-list");
-  if (list.children.length >= 4) return; // max 4 segments
-  const row = document.createElement("div");
-  row.style.cssText = "display:flex;align-items:center;gap:6px";
-  row.innerHTML = `
-    <input type="number" min="0.1" max="30" step="0.1" placeholder="mi" value="${miles||""}"
-      style="width:62px;padding:6px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:13px"
-      oninput="validateSplitMiles()" class="split-mi-inp">
-    <select style="flex:1;padding:6px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:13px" class="split-shoe-sel">
-      ${shoeOptions(shoeId||"")}
-    </select>
-    <button onclick="this.parentElement.remove();validateSplitMiles()"
-      style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">×</button>`;
-  list.appendChild(row);
-  if (list.children.length >= 4) document.getElementById("add-split-btn").style.display = "none";
-}
-
-function validateSplitMiles() {
-  const total = window._editingRunDist || 0;
-  const rows  = document.querySelectorAll(".split-mi-inp");
-  const used  = Array.from(rows).reduce((s, r) => s + (parseFloat(r.value)||0), 0);
-  const warn  = document.getElementById("split-miles-warn");
-  if (rows.length === 0) { warn.style.display = "none"; return; }
-  const diff  = Math.abs(total - used);
-  if (diff > 0.05) {
-    warn.textContent = `Split total ${used.toFixed(2)} mi vs activity ${total.toFixed(2)} mi (${used < total ? "+" : ""}${(total-used).toFixed(2)} mi remaining)`;
-    warn.style.display = "";
-  } else {
-    warn.style.display = "none";
-  }
 }
 
 function saveActEdit() {
@@ -1917,59 +1861,21 @@ function saveActEdit() {
   const newShoe  = document.getElementById("act-shoe-inp").value;
   const dist     = parseFloat(fmtDist(run.distance||0));
 
-  // Read split rows if any exist
-  const splitRows = document.querySelectorAll("#split-shoe-list > div");
-  const shoeSplit = [];
-  splitRows.forEach(row => {
-    const mi    = parseFloat(row.querySelector(".split-mi-inp").value) || 0;
-    const shoe  = row.querySelector(".split-shoe-sel").value;
-    if (mi > 0 && shoe) shoeSplit.push({ shoe, miles: mi });
-  });
-  const usingSplit = shoeSplit.length > 0;
-
-  // ── Remove miles from previously assigned shoes ──────────
-  if (prevEdit.shoeSplit && prevEdit.shoeSplit.length) {
-    // Remove split segment miles
-    prevEdit.shoeSplit.forEach(seg => {
-      const ps = STATE.shoes.find(s => s.id === seg.shoe);
-      if (ps) ps.miles = Math.max(0, parseFloat((ps.miles - seg.miles).toFixed(2)));
-    });
-    // Remove main shoe remainder miles
-    const prevSplitTotal = prevEdit.shoeSplit.reduce((s, seg) => s + seg.miles, 0);
-    const prevMainMiles  = parseFloat((dist - prevSplitTotal).toFixed(2));
-    if (prevEdit.shoe && prevMainMiles > 0) {
-      const ps = STATE.shoes.find(s => s.id === prevEdit.shoe);
-      if (ps) ps.miles = Math.max(0, parseFloat((ps.miles - prevMainMiles).toFixed(2)));
-    }
-  } else if (prevEdit.shoe) {
+  // Remove miles from previous shoe
+  if (prevEdit.shoe && prevEdit.shoe !== newShoe) {
     const ps = STATE.shoes.find(s => s.id === prevEdit.shoe);
     if (ps) ps.miles = Math.max(0, parseFloat((ps.miles - dist).toFixed(2)));
   }
-
-  // ── Add miles to newly assigned shoes ────────────────────
-  if (usingSplit) {
-    // Split segments (WU/CD etc)
-    shoeSplit.forEach(seg => {
-      const ns = STATE.shoes.find(s => s.id === seg.shoe);
-      if (ns) ns.miles = parseFloat((ns.miles + seg.miles).toFixed(2));
-    });
-    // Main shoe gets the remaining miles
-    const splitTotal = shoeSplit.reduce((s, seg) => s + seg.miles, 0);
-    const mainMiles  = parseFloat((dist - splitTotal).toFixed(2));
-    if (newShoe && mainMiles > 0) {
-      const ns = STATE.shoes.find(s => s.id === newShoe);
-      if (ns) ns.miles = parseFloat((ns.miles + mainMiles).toFixed(2));
-    }
-  } else if (newShoe) {
+  // Add miles to new shoe
+  if (newShoe && newShoe !== prevEdit.shoe) {
     addMilesToShoe(newShoe, dist);
   }
 
   STATE.actEdits[run.id] = {
-    name:      document.getElementById("act-name-inp").value,
-    type:      document.getElementById("act-type-inp").value,
-    shoe:      usingSplit ? (shoeSplit[0]?.shoe || newShoe) : newShoe, // primary shoe for display
-    shoeSplit: usingSplit ? shoeSplit : null,
-    notes:     document.getElementById("act-notes-inp").value,
+    name:  document.getElementById("act-name-inp").value,
+    type:  document.getElementById("act-type-inp").value,
+    shoe:  newShoe,
+    notes: document.getElementById("act-notes-inp").value,
   };
 
   save("shoes", STATE.shoes);
@@ -1985,30 +1891,17 @@ function saveActEdit() {
 function assignShoe(i, shoeId) {
   const run  = loadedRuns[i];
   if (!run) return;
-  const edit = STATE.actEdits[run.id] || {};
-  const prev = edit.shoe;
+  const prev = (STATE.actEdits[run.id]||{}).shoe;
   const dist = parseFloat(fmtDist(run.distance||0));
-
-  // If a shoeSplit is already set, don't touch shoe mileage here —
-  // the split already accounts for it. Just update the primary shoe label.
-  if (edit.shoeSplit && edit.shoeSplit.length) {
-    STATE.actEdits[run.id] = {...edit, shoe: shoeId};
-    bsave("actEdits", STATE.actEdits);
-    syncSettingToSheet("actEdits", STATE.actEdits);
-    toast("Primary shoe updated (split mileage unchanged)");
-    return;
-  }
-
-  // No split — normal full-distance assignment
   if (prev && prev !== shoeId) {
     const ps = STATE.shoes.find(s=>s.id===prev);
-    if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles-dist).toFixed(2))); }
+    if (ps) ps.miles = Math.max(0, parseFloat((ps.miles-dist).toFixed(2)));
   }
   if (shoeId && shoeId !== prev) {
     const ns = STATE.shoes.find(s=>s.id===shoeId);
-    if (ns) { ns.miles = parseFloat((ns.miles+dist).toFixed(2)); }
+    if (ns) ns.miles = parseFloat((ns.miles+dist).toFixed(2));
   }
-  STATE.actEdits[run.id] = {...edit, shoe: shoeId};
+  STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe: shoeId};
   save("shoes", STATE.shoes);
   syncSettingToSheet("shoes", STATE.shoes);
   bsave("actEdits", STATE.actEdits);
