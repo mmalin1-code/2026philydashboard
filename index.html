@@ -1586,7 +1586,8 @@ function recalcShoeMiles() {
     toast("Load your Strava runs first (Strava tab → Refresh)");
     return;
   }
-  // Calculate what miles SHOULD be based on actEdits + loadedRuns
+
+  // Count miles per shoe from all loaded runs
   const calc = {};
   STATE.shoes.forEach(s => calc[s.id] = 0);
   (loadedRuns || []).forEach(run => {
@@ -1598,17 +1599,21 @@ function recalcShoeMiles() {
     }
   });
 
-  // Build comparison message
+  // Show what will be applied
   const lines = STATE.shoes.map(s => {
-    const current = s.miles.toFixed(1);
     const fromRuns = (calc[s.id] || 0).toFixed(1);
-    const diff = (s.miles - (calc[s.id] || 0)).toFixed(1);
-    const diffStr = diff > 0 ? `+${diff} over` : diff < 0 ? `${diff} under` : "matches";
-    return `${s.name}: current ${current}mi vs assigned ${fromRuns}mi (${diffStr})`;
+    const assigned = Object.values(STATE.actEdits).filter(e => e.shoe === s.id).length;
+    return `• ${s.name}: ${fromRuns}mi (${assigned} runs assigned)`;
   }).join("\n");
 
-  const msg = `Shoe mileage comparison (current vs calculated from assigned runs):\n\n${lines}\n\nNote: difference may include runs loaded before your block start date, or runs not yet loaded. Update individual shoes manually if needed.`;
-  alert(msg);
+  if (!confirm(`Recalculate shoe mileage from ${loadedRuns.length} loaded runs?\n\n${lines}\n\nThis replaces current totals.`)) return;
+
+  // Apply fresh totals
+  STATE.shoes.forEach(s => s.miles = calc[s.id] ?? s.miles);
+  save("shoes", STATE.shoes);
+  syncSettingToSheet("shoes", STATE.shoes);
+  renderShoes();
+  toast("Shoe mileage recalculated");
 }
 
 function addMilesToShoe(shoeId, miles) {
@@ -1717,7 +1722,7 @@ async function loadActivities() {
     const token = await getValidStravaToken();
     if (!token) throw new Error("Not connected — click Connect with Strava.");
 
-    const res = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=60", {
+    const res = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=200", {
       headers: { "Authorization": "Bearer " + token }
     });
     if (!res.ok) {
