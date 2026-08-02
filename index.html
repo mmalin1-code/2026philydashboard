@@ -1959,22 +1959,32 @@ function saveActEdit() {
 }
 
 function assignShoe(i, shoeId) {
-  const run = loadedRuns[i];
+  const run  = loadedRuns[i];
   if (!run) return;
-  const prev = (STATE.actEdits[run.id]||{}).shoe;
+  const edit = STATE.actEdits[run.id] || {};
+  const prev = edit.shoe;
   const dist = parseFloat(fmtDist(run.distance||0));
-  // remove miles from old shoe
+
+  // If a shoeSplit is already set, don't touch shoe mileage here —
+  // the split already accounts for it. Just update the primary shoe label.
+  if (edit.shoeSplit && edit.shoeSplit.length) {
+    STATE.actEdits[run.id] = {...edit, shoe: shoeId};
+    bsave("actEdits", STATE.actEdits);
+    syncSettingToSheet("actEdits", STATE.actEdits);
+    toast("Primary shoe updated (split mileage unchanged)");
+    return;
+  }
+
+  // No split — normal full-distance assignment
   if (prev && prev !== shoeId) {
     const ps = STATE.shoes.find(s=>s.id===prev);
     if (ps) { ps.miles = Math.max(0, parseFloat((ps.miles-dist).toFixed(2))); }
   }
-  // add miles to new shoe
   if (shoeId && shoeId !== prev) {
     const ns = STATE.shoes.find(s=>s.id===shoeId);
     if (ns) { ns.miles = parseFloat((ns.miles+dist).toFixed(2)); }
   }
-  STATE.actEdits[run.id] = {...(STATE.actEdits[run.id]||{}), shoe:shoeId};
-  // always save and sync after any shoe change
+  STATE.actEdits[run.id] = {...edit, shoe: shoeId};
   save("shoes", STATE.shoes);
   syncSettingToSheet("shoes", STATE.shoes);
   bsave("actEdits", STATE.actEdits);
