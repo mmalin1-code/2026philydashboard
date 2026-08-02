@@ -401,6 +401,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="flex-row" style="margin-bottom:16px">
     <h3 style="font-size:16px;font-weight:600">Shoe tracker</h3>
     <button class="btn btn-sm ml-auto" onclick="openAddShoe()">+ Add shoe</button>
+    <button class="btn btn-sm" onclick="recalcShoeMiles()" style="margin-left:6px" title="Rebuild mileage from assigned runs">↺ Recalc miles</button>
   </div>
   <div class="shoes-grid" id="shoes-grid"></div>
   <p style="font-size:12px;color:var(--mut);margin-top:8px">Select a shoe on each Strava activity to track mileage automatically.</p>
@@ -1580,6 +1581,36 @@ function deleteShoe(id) {
   save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes);
   renderShoes();
 }
+function recalcShoeMiles() {
+  if (!loadedRuns || !loadedRuns.length) {
+    toast("Load your Strava runs first (Strava tab → Refresh)");
+    return;
+  }
+  // Calculate what miles SHOULD be based on actEdits + loadedRuns
+  const calc = {};
+  STATE.shoes.forEach(s => calc[s.id] = 0);
+  (loadedRuns || []).forEach(run => {
+    const edit = STATE.actEdits[run.id];
+    if (!edit || !edit.shoe) return;
+    if (calc[edit.shoe] !== undefined) {
+      const dist = parseFloat(fmtDist(run.distance || 0));
+      calc[edit.shoe] = parseFloat((calc[edit.shoe] + dist).toFixed(2));
+    }
+  });
+
+  // Build comparison message
+  const lines = STATE.shoes.map(s => {
+    const current = s.miles.toFixed(1);
+    const fromRuns = (calc[s.id] || 0).toFixed(1);
+    const diff = (s.miles - (calc[s.id] || 0)).toFixed(1);
+    const diffStr = diff > 0 ? `+${diff} over` : diff < 0 ? `${diff} under` : "matches";
+    return `${s.name}: current ${current}mi vs assigned ${fromRuns}mi (${diffStr})`;
+  }).join("\n");
+
+  const msg = `Shoe mileage comparison (current vs calculated from assigned runs):\n\n${lines}\n\nNote: difference may include runs loaded before your block start date, or runs not yet loaded. Update individual shoes manually if needed.`;
+  alert(msg);
+}
+
 function addMilesToShoe(shoeId, miles) {
   const shoe = STATE.shoes.find(s => s.id===shoeId);
   if (shoe) { shoe.miles = parseFloat((shoe.miles + miles).toFixed(2)); save("shoes", STATE.shoes); syncSettingToSheet("shoes",STATE.shoes); renderShoes(); }
