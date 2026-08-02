@@ -401,7 +401,7 @@ input,select,textarea{font-family:var(--sans)}
   <div class="flex-row" style="margin-bottom:16px">
     <h3 style="font-size:16px;font-weight:600">Shoe tracker</h3>
     <button class="btn btn-sm ml-auto" onclick="openAddShoe()">+ Add shoe</button>
-    <button class="btn btn-sm" onclick="recalcShoeMiles()" style="margin-left:6px" title="Rebuild mileage from assigned runs">↺ Recalc miles</button>
+    <button class="btn btn-sm" onclick="recalcShoeMiles()" style="margin-left:6px" title="Rebuild mileage from assigned runs">↺ Recalculate Shoe Miles</button>
   </div>
   <div class="shoes-grid" id="shoes-grid"></div>
   <p style="font-size:12px;color:var(--mut);margin-top:8px">Select a shoe on each Strava activity to track mileage automatically.</p>
@@ -824,8 +824,19 @@ input,select,textarea{font-family:var(--sans)}
       <select id="act-type-inp"></select>
     </div>
     <div class="form-row">
-      <label>Shoe</label>
+      <label>Main shoe <span id="act-shoe-main-miles" style="font-size:11px;color:var(--mut);font-weight:400"></span></label>
       <select id="act-shoe-inp"></select>
+    </div>
+    <div class="form-row">
+      <label>Secondary shoe <span style="font-size:10px;color:var(--mut);font-weight:400">(optional — WU/CD)</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="act-shoe2-inp" style="flex:1" onchange="updateMainMilesLabel()">
+          <option value="">None</option>
+        </select>
+        <input type="number" id="act-shoe2-miles" min="0.1" max="30" step="0.1" placeholder="mi"
+          style="width:65px;padding:8px 6px;text-align:center;background:var(--sur2);border:1.5px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-size:13px;font-weight:600"
+          oninput="updateMainMilesLabel()">
+      </div>
     </div>
     <div class="form-row">
       <label>Notes</label>
@@ -1587,28 +1598,30 @@ function recalcShoeMiles() {
     return;
   }
 
-  // Count miles per shoe from all loaded runs
   const calc = {};
   STATE.shoes.forEach(s => calc[s.id] = 0);
+
   (loadedRuns || []).forEach(run => {
     const edit = STATE.actEdits[run.id];
     if (!edit || !edit.shoe) return;
-    if (calc[edit.shoe] !== undefined) {
-      const dist = parseFloat(fmtDist(run.distance || 0));
-      calc[edit.shoe] = parseFloat((calc[edit.shoe] + dist).toFixed(2));
-    }
+    const dist    = parseFloat(fmtDist(run.distance || 0));
+    const sec     = (edit.shoe2 && edit.shoe2miles) ? edit.shoe2miles : 0;
+    const mainMi  = parseFloat((dist - sec).toFixed(2));
+
+    if (calc[edit.shoe] !== undefined && mainMi > 0)
+      calc[edit.shoe] = parseFloat((calc[edit.shoe] + mainMi).toFixed(2));
+    if (edit.shoe2 && sec > 0 && calc[edit.shoe2] !== undefined)
+      calc[edit.shoe2] = parseFloat((calc[edit.shoe2] + sec).toFixed(2));
   });
 
-  // Show what will be applied
   const lines = STATE.shoes.map(s => {
     const fromRuns = (calc[s.id] || 0).toFixed(1);
-    const assigned = Object.values(STATE.actEdits).filter(e => e.shoe === s.id).length;
-    return `• ${s.name}: ${fromRuns}mi (${assigned} runs assigned)`;
+    const assigned = Object.values(STATE.actEdits).filter(e => e.shoe === s.id || e.shoe2 === s.id).length;
+    return `• ${s.name}: ${fromRuns}mi (${assigned} runs)`;
   }).join("\n");
 
-  if (!confirm(`Recalculate shoe mileage from ${loadedRuns.length} loaded runs?\n\n${lines}\n\nThis replaces current totals.`)) return;
+  if (!confirm(`Recalculate Shoe Miles from ${loadedRuns.length} loaded runs?\n\n${lines}\n\nThis replaces current totals.`)) return;
 
-  // Apply fresh totals
   STATE.shoes.forEach(s => s.miles = calc[s.id] ?? s.miles);
   save("shoes", STATE.shoes);
   syncSettingToSheet("shoes", STATE.shoes);
@@ -1866,6 +1879,12 @@ function renderActivities(runs) {
         ${run.average_heartrate?`<span>♥ ${Math.round(run.average_heartrate)} bpm</span>`:""}
       </div>
       <select class="act-shoe-sel" data-i="${i}" onchange="assignShoe(${i},this.value)">${shoeOptions(shoe)}</select>
+      ${edit.shoe2 && edit.shoe2miles ? (() => {
+        const s2 = STATE.shoes.find(x => x.id === edit.shoe2);
+        const mainMi = parseFloat((parseFloat(fmtDist(run.distance||0)) - edit.shoe2miles).toFixed(2));
+        const s1 = STATE.shoes.find(x => x.id === shoe);
+        return `<div style="font-size:11px;color:var(--mut);margin-top:-4px;margin-bottom:6px">${mainMi}mi in ${s1?s1.name:shoe} · ${edit.shoe2miles}mi in ${s2?s2.name:edit.shoe2}</div>`;
+      })() : ""}
       ${run.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:8px;font-style:italic">"${run.description}"</div>`:""}`;
     list.appendChild(c);
   });
@@ -1882,12 +1901,30 @@ function openActEdit(i) {
   editingActIdx = i;
   const run  = loadedRuns[i];
   const edit = STATE.actEdits[run.id] || {};
+  window._editingRunDist = parseFloat(fmtDist(run.distance || 0));
+
   document.getElementById("act-name-inp").value  = edit.name  || run.name;
   document.getElementById("act-notes-inp").value = edit.notes || run.description || "";
-  document.getElementById("act-type-inp").innerHTML = runTypeOptions(edit.type||"");
-  document.getElementById("act-shoe-inp").innerHTML = shoeOptions(edit.shoe||"");
+  document.getElementById("act-type-inp").innerHTML  = runTypeOptions(edit.type||"");
+  document.getElementById("act-shoe-inp").innerHTML  = shoeOptions(edit.shoe||"");
 
+  // Secondary shoe
+  document.getElementById("act-shoe2-inp").innerHTML = `<option value="">None</option>` + STATE.shoes.map(s =>
+    `<option value="${s.id}" ${edit.shoe2===s.id?"selected":""}>${s.name}</option>`
+  ).join("");
+  document.getElementById("act-shoe2-miles").value = edit.shoe2miles || "";
+
+  updateMainMilesLabel();
   openModal("modal-act");
+}
+
+function updateMainMilesLabel() {
+  const total    = window._editingRunDist || 0;
+  const sec      = parseFloat(document.getElementById("act-shoe2-miles").value) || 0;
+  const shoe2    = document.getElementById("act-shoe2-inp").value;
+  const mainMi   = shoe2 ? Math.max(0, parseFloat((total - sec).toFixed(2))) : total;
+  const lbl      = document.getElementById("act-shoe-main-miles");
+  if (lbl) lbl.textContent = shoe2 ? `— ${mainMi.toFixed(2)} mi` : `— ${total.toFixed(2)} mi`;
 }
 
 function saveActEdit() {
@@ -1895,23 +1932,41 @@ function saveActEdit() {
   const run      = loadedRuns[editingActIdx];
   const prevEdit = STATE.actEdits[run.id] || {};
   const newShoe  = document.getElementById("act-shoe-inp").value;
-  const dist     = parseFloat(fmtDist(run.distance||0));
+  const newShoe2 = document.getElementById("act-shoe2-inp").value;
+  const shoe2mi  = parseFloat(document.getElementById("act-shoe2-miles").value) || 0;
+  const dist     = parseFloat(fmtDist(run.distance || 0));
+  const mainMi   = newShoe2 && shoe2mi > 0 ? parseFloat((dist - shoe2mi).toFixed(2)) : dist;
 
-  // Remove miles from previous shoe
-  if (prevEdit.shoe && prevEdit.shoe !== newShoe) {
+  // ── Remove miles from previously assigned shoes ──────────
+  const prevMainMi = prevEdit.shoe2 && prevEdit.shoe2miles
+    ? parseFloat((dist - (prevEdit.shoe2miles||0)).toFixed(2))
+    : dist;
+  if (prevEdit.shoe) {
     const ps = STATE.shoes.find(s => s.id === prevEdit.shoe);
-    if (ps) ps.miles = Math.max(0, parseFloat((ps.miles - dist).toFixed(2)));
+    if (ps) ps.miles = Math.max(0, parseFloat((ps.miles - prevMainMi).toFixed(2)));
   }
-  // Add miles to new shoe
-  if (newShoe && newShoe !== prevEdit.shoe) {
-    addMilesToShoe(newShoe, dist);
+  if (prevEdit.shoe2 && prevEdit.shoe2miles) {
+    const ps2 = STATE.shoes.find(s => s.id === prevEdit.shoe2);
+    if (ps2) ps2.miles = Math.max(0, parseFloat((ps2.miles - prevEdit.shoe2miles).toFixed(2)));
+  }
+
+  // ── Add miles to newly assigned shoes ────────────────────
+  if (newShoe && mainMi > 0) {
+    const ns = STATE.shoes.find(s => s.id === newShoe);
+    if (ns) ns.miles = parseFloat((ns.miles + mainMi).toFixed(2));
+  }
+  if (newShoe2 && shoe2mi > 0) {
+    const ns2 = STATE.shoes.find(s => s.id === newShoe2);
+    if (ns2) ns2.miles = parseFloat((ns2.miles + shoe2mi).toFixed(2));
   }
 
   STATE.actEdits[run.id] = {
-    name:  document.getElementById("act-name-inp").value,
-    type:  document.getElementById("act-type-inp").value,
-    shoe:  newShoe,
-    notes: document.getElementById("act-notes-inp").value,
+    name:       document.getElementById("act-name-inp").value,
+    type:       document.getElementById("act-type-inp").value,
+    shoe:       newShoe,
+    shoe2:      newShoe2 || null,
+    shoe2miles: newShoe2 && shoe2mi > 0 ? shoe2mi : null,
+    notes:      document.getElementById("act-notes-inp").value,
   };
 
   save("shoes", STATE.shoes);
